@@ -1,0 +1,124 @@
+/* Editor chrome. The canvas is the product; the page around it stays dark and
+   quiet. Canvas scales to fit the viewport while keeping 9:16. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0e0e13;
+  --panel: #17171f;
+  --line: #26262f;
+  --text: #e8e8ee;
+  --dim: #8a8a96;
+  --accent: #ff5b2e;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 14px;
+  gap: 12px;
+}
+
+.topbar {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.topbar h1 {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.phase {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seed-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.seed-field input {
+  width: 120px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: 600 13px ui-monospace, monospace;
+  padding: 7px 9px;
+}
+
+.btn {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) { border-color: var(--dim); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.canvas-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+
+#game {
+  /* Logical 1080x1920, displayed scaled. height drives the fit. */
+  height: min(82vh, 920px);
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.6);
+}
+
+.statusbar {
+  font: 500 12px ui-monospace, monospace;
+  color: var(--dim);
+}
