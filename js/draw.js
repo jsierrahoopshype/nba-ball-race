@@ -1,5 +1,5 @@
-// World drawing. Pure functions of (ctx, race, camera): no DOM, no state, so the
-// Phase 4 offline HQ renderer can reuse this module untouched.
+// World drawing. Pure functions of (ctx, race, cam): no DOM, no state, so the
+// future offline HQ renderer can reuse this module untouched.
 
 import { CONFIG } from './config.js';
 
@@ -7,35 +7,44 @@ const SKY_TOP = '#7dd0f7';
 const SKY_BOTTOM = '#5cb8ec';
 const OBSTACLE = '#15151a';
 
-export function drawWorld(ctx, race, camY) {
-  const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
+// Square center-crop of any image into a circle area (headshots are not square)
+export function drawImageCover(ctx, img, x, y, size) {
+  const s = Math.min(img.width, img.height);
+  const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+  ctx.drawImage(img, sx, sy, s, s, x, y, size, size);
+}
 
-  // Sky
+export function drawWorld(ctx, race, cam) {
+  const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H, Z = CONFIG.ZOOM;
+
+  // Sky (screen space)
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, SKY_TOP);
   g.addColorStop(1, SKY_BOTTOM);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  // Clouds (parallax at 0.55x scroll speed)
+  // Clouds (parallax)
   ctx.save();
-  ctx.translate(0, -camY * 0.55);
+  ctx.scale(Z, Z);
+  ctx.translate(-cam.x * 0.8, -cam.y * 0.55);
   for (const c of race.course.clouds) {
-    if (c.y < camY * 0.55 - 200 || c.y > camY * 0.55 + H + 200) continue;
+    if (c.y < cam.y * 0.55 - 200 || c.y > cam.y * 0.55 + cam.visH + 200) continue;
     drawCloud(ctx, c.x, c.y, c.s);
   }
   ctx.restore();
 
+  // World layer
   ctx.save();
-  ctx.translate(0, -camY);
+  ctx.scale(Z, Z);
+  ctx.translate(-cam.x, -cam.y);
 
-  // Obstacles as flat silhouettes
   ctx.fillStyle = OBSTACLE;
   for (const body of race.course.bodies) {
     if (body.label === 'wall') continue;
     const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
     for (const part of parts) {
-      if (part.bounds.max.y < camY - 100 || part.bounds.min.y > camY + H + 100) continue;
+      if (part.bounds.max.y < cam.y - 100 || part.bounds.min.y > cam.y + cam.visH + 100) continue;
       if (part.circleRadius) {
         ctx.beginPath();
         ctx.arc(part.position.x, part.position.y, part.circleRadius, 0, Math.PI * 2);
@@ -50,10 +59,7 @@ export function drawWorld(ctx, race, camY) {
     }
   }
 
-  // Finish line: checkered band
   drawFinish(ctx, race.course.finishY);
-
-  // Balls
   for (const ball of race.balls) drawBall(ctx, ball);
 
   ctx.restore();
@@ -85,11 +91,9 @@ export function drawBall(ctx, ball) {
   const r = ball.circleRadius;
 
   ctx.save();
-  // Soft drop shadow sells the cartoon depth
   ctx.shadowColor = 'rgba(0,0,0,0.3)';
   ctx.shadowBlur = 14;
   ctx.shadowOffsetY = 6;
-
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = p.color;
@@ -97,25 +101,23 @@ export function drawBall(ctx, ball) {
   ctx.restore();
 
   if (p.image) {
-    // Phase 3: clip headshot into the circle, rotating with the body
+    // Headshot clipped into the circle, rotating with the body (meme physics)
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.clip();
     ctx.translate(x, y);
     ctx.rotate(ball.angle);
-    ctx.drawImage(p.image, -r, -r, r * 2, r * 2);
+    drawImageCover(ctx, p.image, -r, -r, r * 2);
     ctx.restore();
   } else {
-    // Placeholder: initials (kept upright; rotating text reads badly at speed)
     ctx.fillStyle = p.textColor;
-    ctx.font = `800 ${Math.round(r * 0.78)}px system-ui, sans-serif`;
+    ctx.font = `800 ${Math.round(r * 0.66)}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(p.label, x, y + 2);
   }
 
-  // Thin outline keeps balls readable against black obstacles
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.lineWidth = 5;

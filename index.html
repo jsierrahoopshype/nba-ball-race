@@ -9,7 +9,7 @@
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 1</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2</span></h1>
       <div class="controls">
         <label class="seed-field">
           seed
@@ -18,8 +18,23 @@
         <button id="btn-race" class="btn primary">RACE</button>
         <button id="btn-replay" class="btn" disabled>REPLAY</button>
         <button id="btn-new" class="btn">NEW RACE</button>
+        <button id="btn-rec" class="btn rec">● REC</button>
       </div>
     </header>
+
+    <details class="editor" open>
+      <summary>Race setup</summary>
+      <div class="editor-body">
+        <label class="count-field">
+          balls
+          <select id="ball-count">
+            <option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option>
+          </select>
+        </label>
+        <div id="ball-rows"></div>
+      </div>
+    </details>
 
     <div class="canvas-wrap">
       <canvas id="game"></canvas>

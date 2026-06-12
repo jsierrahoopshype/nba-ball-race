@@ -3,6 +3,7 @@
 // right-edge rail where platform UI sits.
 
 import { CONFIG } from './config.js';
+import { drawImageCover } from './draw.js';
 
 const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
 
@@ -24,11 +25,20 @@ export function drawLeaderboard(ctx, standings) {
     ctx.strokeStyle = i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.9)';
     ctx.stroke();
 
-    ctx.fillStyle = p.textColor;
-    ctx.font = `800 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(p.label, x + r, y + 1);
+    if (p.image) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + r, y, r, 0, Math.PI * 2);
+      ctx.clip();
+      drawImageCover(ctx, p.image, x, y - r, r * 2);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = p.textColor;
+      ctx.font = `800 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.label, x + r, y + 1);
+    }
 
     // Rank badge
     ctx.beginPath();
@@ -86,7 +96,7 @@ export function drawWinner(ctx, winnerBall, t) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(p.image, cx - r, cy - r, r * 2, r * 2);
+    drawImageCover(ctx, p.image, cx - r, cy - r, r * 2);
     ctx.restore();
   } else {
     ctx.fillStyle = p.textColor;

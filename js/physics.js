@@ -58,6 +58,14 @@ export function createRace(seed, ballConfigs) {
       const p = ball.plugin.ball;
       if (p.finished) continue;
 
+      // Velocity cap: prevents fast balls from tunneling through thin obstacles
+      const v = ball.velocity;
+      const speed = Math.hypot(v.x, v.y);
+      if (speed > CONFIG.MAX_SPEED) {
+        const k = CONFIG.MAX_SPEED / speed;
+        Matter.Body.setVelocity(ball, { x: v.x * k, y: v.y * k });
+      }
+
       // Progress tracking
       if (ball.position.y > p.bestY + CONFIG.PROGRESS_EPS) {
         p.bestY = ball.position.y;

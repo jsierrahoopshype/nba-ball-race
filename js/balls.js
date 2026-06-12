@@ -1,22 +1,39 @@
-// Ball creation. Phase 1 uses placeholder discs (color + initials).
-// Phase 3 swaps `image` for real headshots/logos; the schema is already in place.
+// Ball creation. Phase 2: balls come from the editor panel (names, colors,
+// uploaded images). Falls back to a preset palette.
 
 import { CONFIG } from './config.js';
 
-// Default Phase 1 matchup. Edit freely to test.
-export const DEFAULT_BALLS = [
-  { id: 'b1', label: 'LBJ', color: '#552583', textColor: '#FDB927' },
-  { id: 'b2', label: 'SC',  color: '#1D428A', textColor: '#FFC72C' },
+export const PALETTE = [
+  { color: '#552583', text: '#FDB927' }, // purple/gold
+  { color: '#1D428A', text: '#FFC72C' }, // blue/gold
+  { color: '#CE1141', text: '#FFFFFF' }, // red/white
+  { color: '#007A33', text: '#FFFFFF' }, // green/white
+  { color: '#E56020', text: '#0B0B0F' }, // orange/dark
+  { color: '#00538C', text: '#FFFFFF' }, // royal/white
+  { color: '#FDB927', text: '#0B0B0F' }, // gold/dark
+  { color: '#98002E', text: '#FFFFFF' }, // wine/white
 ];
+
+export const DEFAULT_BALLS = [
+  { id: 'b1', label: 'LBJ', color: PALETTE[0].color, textColor: PALETTE[0].text },
+  { id: 'b2', label: 'SC',  color: PALETTE[1].color, textColor: PALETTE[1].text },
+];
+
+// Readable text color for an arbitrary user-picked background
+export function contrastText(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#0B0B0F' : '#FFFFFF';
+}
 
 export function makeBalls(configs, rng) {
   const n = configs.length;
-  const slotW = Math.min(160, (CONFIG.WORLD_W - 200) / Math.max(1, n - 1));
+  const slotW = Math.min(150, (CONFIG.WORLD_W - 220) / Math.max(1, n - 1));
   const startX = CONFIG.WORLD_W / 2 - slotW * (n - 1) / 2;
 
   return configs.map((cfg, i) => {
     const body = Matter.Bodies.circle(
-      startX + i * slotW + rng.range(-6, 6), // tiny seeded spawn jitter
+      startX + i * slotW + rng.range(-6, 6),
       170 + rng.range(-10, 10),
       CONFIG.BALL_RADIUS,
       {
@@ -28,12 +45,12 @@ export function makeBalls(configs, rng) {
       }
     );
     body.plugin.ball = {
-      id: cfg.id,
-      label: cfg.label,
+      id: cfg.id || `b${i + 1}`,
+      label: (cfg.label || `P${i + 1}`).toUpperCase().slice(0, 4),
       color: cfg.color,
-      textColor: cfg.textColor,
-      image: cfg.image || null,    // Phase 3: HTMLImageElement
-      bestY: body.position.y,      // progress tracking for anti-stall + leaderboard
+      textColor: cfg.textColor || contrastText(cfg.color),
+      image: cfg.image || null,    // HTMLImageElement (uploaded in the editor)
+      bestY: body.position.y,
       stallSteps: 0,
       finished: false,
       finishStep: null,

@@ -1,6 +1,6 @@
 # NBA Ball Race
 
-Vertical (9:16) physics racing game for NBA social clips. Phase 1 of 5.
+Vertical (9:16) physics racing game for NBA social clips. Phase 2 of 5.
 
 ## Run it
 
@@ -17,12 +17,18 @@ Always test through the GitHub Pages URL.
 - NEW RACE: fresh random seed
 - Paste any seed into the field + RACE to bring back a past race
 
-## Phase 1 includes
+## Phase 2 includes
 
-Fixed-timestep Matter.js physics, fully seeded/deterministic (replays are exact),
-one preset course (~60s for 2 balls, verified 50-70s across seeds, zero stalls),
-leader-follow camera, anti-stall failsafe, moderate rubber band, sticky shelves,
-spinners, countdown, Top 3 leaderboard, winner screen.
+Everything from Phase 1 (seeded determinism, anti-stall, rubber band, Top 3 HUD,
+winner screen) plus: dense course (gates, big dots, wider shelves, no free-fall
+lanes), bouncier/faster physics with a tunneling-proof speed cap, zoomed camera
+with horizontal leader tracking, a race setup panel (2-8 balls, names, colors,
+image upload per ball), and Quick Record (REC button captures the race in the
+seed field to a WebM in Downloads, named race_<names>_s<seed>.webm).
+
+Record workflow: run NEW RACE until a finish you like, then hit REC: it replays
+and records that exact race. Verified: 62s avg for 2 balls, 46-66s for 8 balls,
+50/50 fairness over 80 races, zero stalls.
 
 ## Headless testing (optional, for Claude Code)
 
@@ -32,7 +38,7 @@ needs `npm install @napi-rs/canvas`).
 
 ## Roadmap
 
-Phase 2: HUD polish, field sizes 2-30, survivor mode, matchup/intro screens.
-Phase 3: editor panel, headshots/logos, courses + shuffle, templates, character library.
-Phase 4: recording (WebM quick + offline MP4 HQ), tournaments, stitching.
+Phase 3: headshot auto-fetch, courses + shuffle, templates, character library,
+matchup/intro screens, survivor mode, fields up to 30.
+Phase 4: offline MP4 HQ render, tournaments, stitching.
 Phase 5: bias system + presets, polish.
