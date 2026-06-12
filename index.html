@@ -4,46 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css">
+<link rel="stylesheet" href="css/editor.css?v=3">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.1</span></h1>
       <div class="controls">
-        <label class="seed-field">
-          seed
+        <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
         </label>
         <button id="btn-race" class="btn primary">RACE</button>
         <button id="btn-replay" class="btn" disabled>REPLAY</button>
         <button id="btn-new" class="btn">NEW RACE</button>
-        <button id="btn-rec" class="btn rec">● REC</button>
+        <button id="btn-rec" class="btn rec">&#9679; REC</button>
       </div>
     </header>
 
     <details class="editor" open>
       <summary>Race setup</summary>
       <div class="editor-body">
-        <label class="count-field">
-          balls
+        <label class="count-field">balls
           <select id="ball-count">
             <option>2</option><option>3</option><option>4</option>
             <option>5</option><option>6</option><option>7</option><option>8</option>
           </select>
+          <span class="hint">type a player or team in the picker to put a face/logo in the ball</span>
         </label>
         <div id="ball-rows"></div>
       </div>
     </details>
 
-    <div class="canvas-wrap">
-      <canvas id="game"></canvas>
-    </div>
-
+    <div class="canvas-wrap"><canvas id="game"></canvas></div>
     <footer class="statusbar"><span id="status">ready</span></footer>
   </main>
 
+  <datalist id="pick-list"></datalist>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>

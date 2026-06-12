@@ -9,12 +9,12 @@ export const CONFIG = {
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
-  GRAVITY_Y: 0.85,
+  GRAVITY_Y: 0.92,
   BALL_RADIUS: 54,
-  BALL_RESTITUTION: 0.62,
+  BALL_RESTITUTION: 0.74,
   BALL_FRICTION: 0.015,
-  BALL_AIR_FRICTION: 0.008,
-  MAX_SPEED: 36,           // px/step velocity cap: prevents tunneling through thin bodies
+  BALL_AIR_FRICTION: 0.006,
+  MAX_SPEED: 40,           // px/step velocity cap: prevents tunneling through thin bodies
 
   // Sticky surfaces: velocity multiplier applied every step while touching
   STICKY_DAMP_X: 0.97,

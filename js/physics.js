@@ -74,13 +74,22 @@ export function createRace(seed, ballConfigs) {
         p.stallSteps++;
       }
 
-      // Anti-stall failsafe: small seeded nudge, never a teleport
+      // Anti-stall failsafe: escalating seeded nudge, never a teleport.
+      // Pushes toward the side with more horizontal room (away from the nearer
+      // wall) so balls wedged at a throat get freed instead of re-jamming.
       if (p.stallSteps >= CONFIG.STALL_STEPS) {
+        const toCenter = (CONFIG.WORLD_W / 2 - ball.position.x);
+        const dir = Math.sign(toCenter) || (rng.chance(0.5) ? 1 : -1);
+        // Escalate if it keeps failing: each retry within a short window hits harder
+        p.nudgeCount = (p.nudgeCount || 0) + 1;
+        const power = 1 + Math.min(p.nudgeCount, 4) * 0.6;
         Matter.Body.setVelocity(ball, {
-          x: rng.range(-CONFIG.NUDGE_X, CONFIG.NUDGE_X),
-          y: CONFIG.NUDGE_Y,
+          x: dir * CONFIG.NUDGE_X * power + rng.range(-2, 2),
+          y: CONFIG.NUDGE_Y * power,
         });
         p.stallSteps = 0;
+      } else if (p.stallSteps === 1) {
+        p.nudgeCount = 0; // moving again; reset escalation
       }
 
       // Moderate rubber band: trailing balls get a gentle extra pull downward

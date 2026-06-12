@@ -1,5 +1,6 @@
-// App shell: editor panel, screen flow (ready -> countdown -> racing -> finished),
-// fixed-timestep loop, and recording. Physics never depends on render rate.
+// App shell: editor (count + per-ball name/color/picker/upload), screen flow,
+// fixed-timestep loop, and recording. Editor state lives in setup.js (pure,
+// tested); this file only wires the DOM to it.
 
 import { CONFIG } from './config.js';
 import { freshSeed } from './rng.js';
@@ -7,8 +8,10 @@ import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
 import { drawLeaderboard, drawCountdown, drawWinner } from './hud.js';
-import { PALETTE, contrastText } from './balls.js';
 import { createRecorder } from './recorder.js';
+import { createSetup } from './setup.js';
+import { loadImage } from './images.js';
+import { PLAYERS, TEAMS, HEADSHOT_URL, TEAM_LOGO_URL } from './rosters.js';
 
 const canvas = document.getElementById('game');
 canvas.width = CONFIG.WORLD_W;
@@ -25,137 +28,142 @@ const countSelect = document.getElementById('ball-count');
 const ballRowsEl = document.getElementById('ball-rows');
 
 const recorder = createRecorder(canvas);
-if (!recorder.supported) btnRec.disabled = true;
+if (!recorder.supported) { btnRec.disabled = true; btnRec.title = 'Recording not supported in this browser'; }
 
-// ---- Editor panel -------------------------------------------------------
+const setup = createSetup(parseInt(countSelect.value, 10));
 
-const DEFAULT_NAMES = ['LBJ', 'SC', 'KD', 'GIA', 'LUKA', 'JOK', 'AE', 'WEMB'];
-let ballSetup = []; // [{label, color, image}]
+// Shared <datalist> of pickable players + teams (native searchable dropdown)
+const pickList = document.getElementById('pick-list');
+for (const [, full] of PLAYERS) {
+  const o = document.createElement('option'); o.value = full; pickList.appendChild(o);
+}
+for (const [, name] of TEAMS) {
+  const o = document.createElement('option'); o.value = `${name} (logo)`; pickList.appendChild(o);
+}
 
-function initSetup(n) {
-  const prev = ballSetup;
-  ballSetup = [];
-  for (let i = 0; i < n; i++) {
-    ballSetup.push(prev[i] || {
-      label: DEFAULT_NAMES[i] || `P${i + 1}`,
-      color: PALETTE[i % PALETTE.length].color,
-      image: null,
-    });
+const playerByName = new Map(PLAYERS.map(p => [p[1].toLowerCase(), p]));
+const teamByLabel = new Map(TEAMS.map(t => [`${t[1].toLowerCase()} (logo)`, t]));
+
+// Resolve a typed pick to an image + short label, async. Falls back silently.
+async function applyPick(i, raw, row) {
+  const key = raw.trim().toLowerCase();
+  const player = playerByName.get(key);
+  const team = teamByLabel.get(key);
+  row.classList.add('loading');
+  try {
+    if (player) {
+      const [short, , id] = player;
+      const img = await loadImage(HEADSHOT_URL(id));
+      if (img) { setup.setImage(i, img, `player:${id}`); setup.setName(i, short); syncRow(row, i); }
+      else status(`couldn't load ${player[1]} headshot (id may need a fix)`);
+    } else if (team) {
+      const [abbr, name] = team;
+      const img = await loadImage(TEAM_LOGO_URL(abbr));
+      if (img) { setup.setImage(i, img, `team:${abbr}`); setup.setName(i, abbr); syncRow(row, i); }
+      else status(`couldn't load ${name} logo`);
+    }
+  } finally {
+    row.classList.remove('loading');
   }
-  renderRows();
+}
+
+function syncRow(row, i) {
+  const b = setup.balls[i];
+  row.querySelector('.name').value = b.label;
+  const chip = row.querySelector('.chip');
+  chip.style.background = b.color;
+  chip.textContent = b.image ? '✓' : '';
 }
 
 function renderRows() {
   ballRowsEl.innerHTML = '';
-  ballSetup.forEach((b, i) => {
+  setup.balls.forEach((b, i) => {
     const row = document.createElement('div');
     row.className = 'ball-row';
 
-    const name = document.createElement('input');
-    name.type = 'text';
-    name.maxLength = 4;
-    name.value = b.label;
-    name.title = 'Name shown on the ball (max 4 chars)';
-    name.addEventListener('input', () => { b.label = name.value; });
-
-    const color = document.createElement('input');
-    color.type = 'color';
-    color.value = b.color;
-    color.addEventListener('input', () => { b.color = color.value; updateChip(); });
-
-    const file = document.createElement('input');
-    file.type = 'file';
-    file.accept = 'image/*';
-    file.id = `file-${i}`;
-    file.className = 'file-hidden';
-    file.addEventListener('change', () => {
-      const f = file.files[0];
-      if (!f) return;
-      const img = new Image();
-      img.onload = () => { b.image = img; updateChip(); };
-      img.src = URL.createObjectURL(f);
-    });
-
-    const fileBtn = document.createElement('label');
-    fileBtn.htmlFor = file.id;
-    fileBtn.className = 'btn small';
-    fileBtn.textContent = 'IMG';
-
     const chip = document.createElement('span');
     chip.className = 'chip';
+    chip.style.background = b.color;
+    chip.textContent = b.image ? '✓' : '';
 
-    function updateChip() {
-      chip.style.background = b.color;
-      chip.textContent = b.image ? '✓' : '';
-    }
-    updateChip();
+    const name = document.createElement('input');
+    name.type = 'text'; name.maxLength = 5; name.value = b.label; name.className = 'name';
+    name.title = 'Label shown on the ball';
+    name.addEventListener('input', () => setup.setName(i, name.value));
 
-    row.append(chip, name, color, fileBtn, file);
+    const color = document.createElement('input');
+    color.type = 'color'; color.value = b.color;
+    color.addEventListener('input', () => { setup.setColor(i, color.value); chip.style.background = color.value; });
+
+    const pick = document.createElement('input');
+    pick.type = 'text'; pick.className = 'pick';
+    pick.setAttribute('list', 'pick-list');
+    pick.placeholder = 'player or team…';
+    pick.addEventListener('change', () => applyPick(i, pick.value, row));
+
+    const file = document.createElement('input');
+    file.type = 'file'; file.accept = 'image/*'; file.id = `file-${i}`; file.className = 'file-hidden';
+    file.addEventListener('change', () => {
+      const f = file.files[0]; if (!f) return;
+      const img = new Image();
+      img.onload = () => { setup.setImage(i, img, 'upload'); chip.textContent = '✓'; };
+      img.src = URL.createObjectURL(f);
+    });
+    const fileBtn = document.createElement('label');
+    fileBtn.htmlFor = file.id; fileBtn.className = 'btn small'; fileBtn.textContent = 'IMG';
+
+    const clear = document.createElement('button');
+    clear.className = 'btn small ghost'; clear.textContent = '×'; clear.title = 'Clear image';
+    clear.addEventListener('click', () => { setup.clearImage(i); pick.value = ''; chip.textContent = ''; });
+
+    row.append(chip, name, color, pick, fileBtn, file, clear);
     ballRowsEl.appendChild(row);
   });
 }
 
-countSelect.addEventListener('change', () => initSetup(parseInt(countSelect.value, 10)));
-initSetup(parseInt(countSelect.value, 10));
+countSelect.addEventListener('change', () => { setup.setCount(parseInt(countSelect.value, 10)); renderRows(); });
+renderRows();
 
-function currentConfigs() {
-  return ballSetup.map((b, i) => ({
-    id: `b${i + 1}`,
-    label: b.label || `P${i + 1}`,
-    color: b.color,
-    textColor: contrastText(b.color),
-    image: b.image,
-  }));
-}
+function status(msg) { statusEl.textContent = msg; }
 
 // ---- Race state machine --------------------------------------------------
 
-let race = null;
-let camera = null;
-let mode = 'idle';        // idle | countdown | racing | finished
-let countdownT = 0;
-let winnerT = 0;
-let accumulator = 0;
-let lastTime = null;
-let recordingThisRace = false;
-let downloadFired = false;
-
+let race = null, camera = null, mode = 'idle';
+let countdownT = 0, winnerT = 0, accumulator = 0, lastTime = null;
+let recordingThisRace = false, downloadFired = false;
 const COUNTDOWN_BEAT = 0.5;
 
 function startRace(seed, record = false) {
-  race = createRace(seed, currentConfigs());
+  race = createRace(seed, setup.toConfigs());
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
   camera.update(lead.position.x, lead.position.y, true);
-  mode = 'countdown';
-  countdownT = 0;
-  winnerT = 0;
-  accumulator = 0;
-  lastTime = null;
-  downloadFired = false;
-  recordingThisRace = record;
+  mode = 'countdown'; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
+  downloadFired = false; recordingThisRace = record;
   seedInput.value = String(seed);
   btnReplay.disabled = false;
-  statusEl.textContent = record ? `● REC | seed ${seed}` : `seed ${seed}`;
-  if (record) recorder.start();
+  if (record) {
+    try { recorder.start(); status(`● REC | seed ${seed}`); }
+    catch (e) { recordingThisRace = false; status(`record failed: ${e.message}`); }
+  } else {
+    status(`seed ${seed}`);
+  }
 }
 
 function finishRecording() {
   if (!recordingThisRace || downloadFired) return;
   downloadFired = true;
-  const names = race.balls.map(b => b.plugin.ball.label.toLowerCase()).slice(0, 4).join('-');
-  recorder.stop(`race_${names}_s${race.seed}.webm`).then(() => {
-    statusEl.textContent = `saved race_${names}_s${race.seed}.webm to Downloads`;
-  });
+  const names = race.balls.map(b => b.plugin.ball.label.toLowerCase().replace(/[^a-z0-9]/g, '')).slice(0, 4).join('-');
+  recorder.stop(`race_${names}_s${race.seed}.webm`)
+    .then(ok => status(ok ? `saved race_${names}_s${race.seed}.webm to Downloads` : 'recording stopped (no data)'))
+    .catch(e => status(`save failed: ${e.message}`));
 }
 
 function loop(now) {
   requestAnimationFrame(loop);
   if (!race) return;
-
   if (lastTime === null) lastTime = now;
-  let dt = (now - lastTime) / 1000;
-  lastTime = now;
+  let dt = (now - lastTime) / 1000; lastTime = now;
   if (dt > 0.25) dt = 0.25;
 
   if (mode === 'countdown') {
@@ -164,13 +172,12 @@ function loop(now) {
   } else if (mode === 'racing') {
     accumulator += dt * 1000;
     while (accumulator >= CONFIG.STEP_MS) {
-      race.tick();
-      accumulator -= CONFIG.STEP_MS;
+      race.tick(); accumulator -= CONFIG.STEP_MS;
       if (race.finished) { mode = 'finished'; winnerT = 0; break; }
     }
   } else if (mode === 'finished') {
     winnerT += dt;
-    if (winnerT > 2.2) finishRecording(); // winner screen held, clip complete
+    if (winnerT > 2.2) finishRecording();
   }
 
   const leader = race.standings()[0];
@@ -180,15 +187,12 @@ function loop(now) {
   drawLeaderboard(ctx, race.standings());
 
   if (mode === 'countdown') {
-    const beat = Math.floor(countdownT / COUNTDOWN_BEAT);
-    drawCountdown(ctx, Math.max(0, 3 - beat));
+    drawCountdown(ctx, Math.max(0, 3 - Math.floor(countdownT / COUNTDOWN_BEAT)));
   } else if (mode === 'racing' && race.step < 45) {
     drawCountdown(ctx, 0);
   } else if (mode === 'finished') {
     drawWinner(ctx, race.winner, winnerT);
-    if (!recordingThisRace) {
-      statusEl.textContent = `seed ${race.seed} | winner: ${race.winner.plugin.ball.label} | ${(race.step / 60).toFixed(1)}s`;
-    }
+    if (!recordingThisRace) status(`seed ${race.seed} | winner: ${race.winner.plugin.ball.label} | ${(race.step / 60).toFixed(1)}s`);
   }
 }
 
@@ -199,8 +203,6 @@ btnRace.addEventListener('click', () => {
 btnReplay.addEventListener('click', () => { if (race) startRace(race.seed); });
 btnNew.addEventListener('click', () => startRace(freshSeed()));
 btnRec.addEventListener('click', () => {
-  // Records the seed currently in the field (replay-record workflow:
-  // find a great race, then hit REC to capture that exact race)
   const v = parseInt(seedInput.value, 10);
   startRace(Number.isFinite(v) ? (v >>> 0) : freshSeed(), true);
 });

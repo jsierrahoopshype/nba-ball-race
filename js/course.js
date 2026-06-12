@@ -1,16 +1,15 @@
-// Course builder. A course is a stack of "blocks" (obstacle rooms) along a long
-// vertical world. Each block function places static bodies starting at a given y
-// and returns the y where the next block should begin.
+// Course builder. Dense, wall-to-wall obstacle rooms stacked along a tall world,
+// modeled on the reference: the frame is almost always full of obstacles, balls
+// are always interacting. Empty sky is the enemy of pace.
 //
-// DESIGN RULES (learned in testing, do not violate):
+// DESIGN RULES (learned the hard way in testing, do not violate):
 // - Every intended passage must be >= 130px wide (ball diameter is 108).
-// - A gap of 1..107px between an obstacle and a wall is a permanent trap. Either
-//   close it (embed the obstacle into the wall) or widen it past a ball diameter.
+// - A 1..107px gap between an obstacle and a wall is a permanent trap. Close it
+//   (embed into the wall) or widen it past a ball diameter.
 // - 45-degree surfaces converging on a wall form rest pockets. Avoid.
-// - Ring gaps must include the bottom of the ring so interiors drain by gravity.
-// - Near-flat wide surfaces stall balls: tilt everything at least 0.05 rad.
-// - Block-to-block vertical clearance must exceed 170px: a block's last body and
-//   the next block's first body can otherwise form a wedge narrower than a ball.
+// - Ring gaps must include the bottom so interiors drain by gravity.
+// - Tilt near-flat wide surfaces at least 0.05 rad or balls stall on them.
+// - Block-to-block vertical clearance must exceed 170px (wedge-trap rule).
 //
 // Body labels: 'obstacle' | 'sticky' | 'bouncy' | 'wall'
 
@@ -20,185 +19,178 @@ const W = CONFIG.WORLD_W;
 
 function rect(x, y, w, h, opts = {}) {
   return Matter.Bodies.rectangle(x, y, w, h, {
-    isStatic: true, label: 'obstacle',
-    restitution: 0.25, friction: 0.04,
-    ...opts,
+    isStatic: true, label: 'obstacle', restitution: 0.35, friction: 0.03, ...opts,
   });
 }
-
 function peg(x, y, r, opts = {}) {
   return Matter.Bodies.circle(x, y, r, {
-    isStatic: true, label: 'obstacle',
-    restitution: 0.35, friction: 0.02,
-    ...opts,
+    isStatic: true, label: 'obstacle', restitution: 0.6, friction: 0.02, ...opts,
   });
 }
 
-// ---- Blocks ------------------------------------------------------------
+// ---- Blocks (each spans full width, stacks tightly) --------------------
 
-// Two angled walls narrowing to a center gap. Compresses the field together.
-function funnel(bodies, y, rng) {
-  const gap = 240, h = 460, wallLen = 700, angle = 0.58;
-  const cx = W / 2 + rng.range(-110, 110);
-  bodies.push(rect(cx - gap / 2 - Math.cos(angle) * wallLen / 2, y + h / 2, wallLen, 40, { angle }));
-  bodies.push(rect(cx + gap / 2 + Math.cos(angle) * wallLen / 2, y + h / 2, wallLen, 40, { angle: -angle }));
-  return y + h + 180;
+// Dense peg field: 5 rows, alternating offset, fills the whole width.
+function pegField(bodies, y, rng, rows = 5) {
+  const sy = 150, r = 40, x0 = 170, x1 = W - 170, sx = 148;
+  for (let row = 0; row < rows; row++) {
+    const off = (row % 2 === 0) ? 0 : sx / 2;
+    for (let x = x0 + off; x <= x1; x += sx) {
+      bodies.push(peg(x + rng.range(-5, 5), y + row * sy, r));
+    }
+  }
+  return y + rows * sy + 175;
 }
 
-// Full-width bars with TWO gaps per row (one per half, positions seeded).
-// Convergence drama without the 800px slow-roll a single gap caused (profiled).
+// Big chunky dots, reference's signature. Two interlocking layouts; lanes flow.
+function bigDots(bodies, y, rng, rows = 4) {
+  const r = 66, sy = 205;
+  const A = [230, 540, 850], B = [385, 695]; // all lanes >= 155px
+  for (let row = 0; row < rows; row++) {
+    for (const x of (row % 2 === 0 ? A : B)) bodies.push(peg(x, y + row * sy, r));
+  }
+  return y + rows * sy + 175;
+}
+
+// Full-width bars, two seeded gaps per row, gentle tilt toward the holes.
 function gates(bodies, y, rng, rows = 3) {
-  const gapW = 185, barH = 46, spacing = 300;
+  const gapW = 180, barH = 44, spacing = 250;
   for (let i = 0; i < rows; i++) {
     const gy = y + i * spacing;
-    const gxL = rng.range(180, 400);
-    const gxR = rng.range(W - 400, W - 180);
+    const gxL = rng.range(170, 400), gxR = rng.range(W - 400, W - 170);
     const leftW = gxL - gapW / 2 + 40;
     const midW = (gxR - gapW / 2) - (gxL + gapW / 2);
     const rightW = (W - gxR - gapW / 2) + 40;
-    const midTilt = rng.pick([-1, 1]) * 0.09;
     const dead = { restitution: 0.05, friction: 0.01 };
     if (leftW > 50) bodies.push(rect(leftW / 2 - 40, gy, leftW, barH, { angle: 0.10, ...dead }));
-    if (midW > 50) bodies.push(rect(gxL + gapW / 2 + midW / 2, gy, midW, barH, { angle: midTilt, ...dead }));
+    if (midW > 50) bodies.push(rect(gxL + gapW / 2 + midW / 2, gy, midW, barH, { angle: rng.pick([-1,1]) * 0.09, ...dead }));
     if (rightW > 50) bodies.push(rect(W + 40 - rightW / 2, gy, rightW, barH, { angle: -0.10, ...dead }));
   }
-  return y + rows * spacing + 170;
+  return y + rows * spacing + 175;
 }
 
-// Classic alternating peg grid, sized for the bigger Phase 2 balls.
-function pegGrid(bodies, y, rng, rows = 4) {
-  const spacingX = 212, spacingY = 168, r = 38;
-  for (let row = 0; row < rows; row++) {
-    const offset = (row % 2 === 0) ? 0 : spacingX / 2;
-    for (let x = 70 + offset; x < W - 50; x += spacingX) {
-      bodies.push(peg(x + rng.range(-8, 8), y + row * spacingY, r));
-    }
-  }
-  return y + rows * spacingY + 170;
-}
-
-// Rows of big chunky dots (the reference's signature look). Two layouts alternate;
-// all gaps >= 120px, wall lanes are tight squeezes (slow) not traps.
-function bigDots(bodies, y, rng, rows = 4) {
-  const r = 80, spacingY = 225;
-  const layoutA = [220, 540, 860], layoutB = [370, 710];
-  for (let row = 0; row < rows; row++) {
-    const xs = (row % 2 === 0) ? layoutA : layoutB;
-    for (const x of xs) bodies.push(peg(x, y + row * spacingY, r));
-  }
-  return y + rows * spacingY + 170;
-}
-
-// Large ring made of segments with a gap.
-function ring(bodies, cx, cy, radius, gapCenterAngle, gapHalfWidth) {
-  const segs = 30;
-  const segLen = (2 * Math.PI * radius / segs) * 1.18;
+// Ring segments with a gap.
+function ringBody(bodies, cx, cy, radius, gapCenter, gapHalf) {
+  const segs = 32, segLen = (2 * Math.PI * radius / segs) * 1.18;
   for (let i = 0; i < segs; i++) {
     const a = (i / segs) * Math.PI * 2;
-    let d = Math.abs(((a - gapCenterAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-    if (d < gapHalfWidth) continue;
-    bodies.push(rect(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, segLen, 30, { angle: a + Math.PI / 2 }));
+    let d = Math.abs(((a - gapCenter + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    if (d < gapHalf) continue;
+    bodies.push(rect(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, segLen, 28, { angle: a + Math.PI / 2 }));
   }
 }
 
-// Two stacked offset rings. Edges stay >= 150px from walls (trap rule).
-// Gap center constrained near PI/2 (bottom) so interiors always drain.
-function ringMaze(bodies, y, rng) {
-  const r1 = 230, r2 = 240;
-  const cx1 = rng.range(420, 620);
-  ring(bodies, cx1, y + r1 + 30, r1, rng.range(1.2, 1.95), 0.44);
-  const cx2 = rng.range(W - 620, W - 420);
-  ring(bodies, cx2, y + r1 * 2 + 60 + r2 + 40, r2, rng.range(1.2, 1.95), 0.44);
-  return y + (r1 + r2) * 2 + 70 + 180;
+// Stacked single rings (reference look). Each centered in the safe middle band
+// (>=140px from walls), gap near the bottom so interiors always drain by gravity.
+// Vertical stacking avoids the wall/inter-ring pockets that side-by-side rings form.
+function ringCluster(bodies, y, rng, count = 2) {
+  const r = 215, sy = 210;
+  for (let i = 0; i < count; i++) {
+    const cx = rng.range(360, 720); // edges stay 145..935: safe from both walls
+    ringBody(bodies, cx, y + r + i * sy, r, rng.range(1.25, 1.9), 0.46);
+  }
+  return y + r + (count - 1) * sy + r + 175;
 }
 
-// Rotated squares. Fixed positions: every passage >= 170px, none near walls.
-function diamondLattice(bodies, y, rng, rows = 3) {
-  const spacingY = 295;
+// Diamond grid filling the width. Fixed safe positions.
+function diamonds(bodies, y, rng, rows = 3) {
+  const sy = 280;
   for (let row = 0; row < rows; row++) {
-    const ry = y + row * spacingY;
+    const ry = y + row * sy;
     if (row % 2 === 0) {
-      bodies.push(rect(330, ry, 170, 170, { angle: Math.PI / 4 }));
-      bodies.push(rect(790, ry, 170, 170, { angle: Math.PI / 4 }));
+      bodies.push(rect(250, ry, 165, 165, { angle: Math.PI / 4 }));
+      bodies.push(rect(540, ry, 165, 165, { angle: Math.PI / 4 }));
+      bodies.push(rect(830, ry, 165, 165, { angle: Math.PI / 4 }));
     } else {
-      bodies.push(rect(540, ry, 215, 215, { angle: Math.PI / 4 }));
+      bodies.push(rect(395, ry, 200, 200, { angle: Math.PI / 4 }));
+      bodies.push(rect(685, ry, 200, 200, { angle: Math.PI / 4 }));
     }
   }
-  return y + rows * spacingY + 170;
+  return y + rows * sy + 175;
 }
 
-// Alternating sticky shelves. Wider than Phase 1 (720px) so the open drop lane
-// is only ~360px and alternates sides: no straight free-fall corridor.
+// Serpentine walls: alternating ledges from each side forcing switchbacks.
+// New block, dense and original. Each ledge tilts down toward its open side.
+function serpentine(bodies, y, rng, count = 4) {
+  const ledgeW = 760, h = 32, sy = 230;
+  for (let i = 0; i < count; i++) {
+    const left = i % 2 === 0;
+    const cx = left ? ledgeW / 2 - 20 : W - ledgeW / 2 + 20;
+    const tilt = (left ? 1 : -1) * rng.range(0.10, 0.14);
+    bodies.push(rect(cx, y + i * sy, ledgeW, h, { angle: tilt, restitution: 0.2, friction: 0.04 }));
+  }
+  return y + count * sy + 175;
+}
+
+// Sticky shelves: the grind zones. Wide, alternating, tilted to keep balls creeping.
 function stickyShelves(bodies, y, rng, count = 3) {
-  const shelfW = 600;
+  const shelfW = 640;
   for (let i = 0; i < count; i++) {
     const left = i % 2 === 0;
     const tilt = (left ? 1 : -1) * rng.range(0.11, 0.16);
     const cx = left ? shelfW / 2 : W - shelfW / 2;
-    bodies.push(rect(cx, y + i * 265, shelfW, 32, {
-      angle: tilt, label: 'sticky', friction: 0.35, restitution: 0,
-    }));
+    bodies.push(rect(cx, y + i * 255, shelfW, 32, { angle: tilt, label: 'sticky', friction: 0.35, restitution: 0 }));
   }
-  return y + count * 265 + 180;
+  return y + count * 255 + 175;
 }
 
-// Rotating crosses. Chaos agents.
-function spinnerPair(bodies, spinners, y, rng) {
-  const positions = [
-    { x: rng.range(280, 420), y: y + 140 },
-    { x: rng.range(W - 420, W - 280), y: y + 560 },
+// Rotating crosses.
+function spinners(bodies, spinnerList, y, rng) {
+  const spots = [
+    { x: rng.range(260, 380), y: y + 150 },
+    { x: W / 2, y: y + 470 },
+    { x: rng.range(W - 380, W - 260), y: y + 150 },
   ];
-  for (const p of positions) {
-    const armLen = rng.range(340, 410);
-    const a = Matter.Bodies.rectangle(p.x, p.y, armLen, 32);
-    const b = Matter.Bodies.rectangle(p.x, p.y, armLen, 32, { angle: Math.PI / 2 });
-    const cross = Matter.Body.create({
-      parts: [a, b], isStatic: true, label: 'obstacle',
-      restitution: 0.5, friction: 0.04,
-    });
+  for (const p of spots) {
+    const len = rng.range(300, 360);
+    const a = Matter.Bodies.rectangle(p.x, p.y, len, 30);
+    const b = Matter.Bodies.rectangle(p.x, p.y, len, 30, { angle: Math.PI / 2 });
+    const cross = Matter.Body.create({ parts: [a, b], isStatic: true, label: 'obstacle', restitution: 0.5, friction: 0.04 });
     cross.plugin.spinSpeed = rng.pick([-1, 1]) * rng.range(0.016, 0.024);
-    bodies.push(cross);
-    spinners.push(cross);
+    bodies.push(cross); spinnerList.push(cross);
   }
-  return y + 560 + 340;
+  return y + 620 + 175;
 }
 
-// High-restitution pegs: pinball relief between grindy sections.
-function bounceZone(bodies, y, rng, rows = 2) {
-  const spacingX = 250, spacingY = 205;
+// Bouncy pinball pegs: relief valve + visual variety.
+function bounceZone(bodies, y, rng, rows = 3) {
+  const sx = 196, sy = 195, x0 = 175, x1 = W - 175;
   for (let row = 0; row < rows; row++) {
-    const offset = (row % 2 === 0) ? 70 : spacingX / 2 + 70;
-    for (let x = offset; x < W - 50; x += spacingX) {
-      bodies.push(peg(x, y + row * spacingY, 46, { label: 'bouncy', restitution: 1.3 }));
+    const off = (row % 2 === 0) ? 0 : sx / 2;
+    for (let x = x0 + off; x <= x1; x += sx) {
+      bodies.push(peg(x, y + row * sy, 44, { label: 'bouncy', restitution: 1.32 }));
     }
   }
-  return y + rows * spacingY + 170;
+  return y + rows * sy + 175;
 }
 
-// ---- Course assembly ----------------------------------------------------
+// Narrowing funnel.
+function funnel(bodies, y, rng) {
+  const gap = 360, h = 380, wallLen = 560, angle = 0.50;
+  const cx = W / 2 + rng.range(-90, 90);
+  bodies.push(rect(cx - gap / 2 - Math.cos(angle) * wallLen / 2, y + h / 2, wallLen, 38, { angle }));
+  bodies.push(rect(cx + gap / 2 + Math.cos(angle) * wallLen / 2, y + h / 2, wallLen, 38, { angle: -angle }));
+  return y + h + 175;
+}
 
-// Phase 2 preset: dense, alternating grind and release, ~60s for 2 balls.
+// ---- Assembly -----------------------------------------------------------
+
 export function buildCourse(rng) {
-  const bodies = [];
-  const spinners = [];
+  const bodies = [], spinnerList = [];
+  let y = 380;
 
-  let y = 420;
-
-  y = funnel(bodies, y, rng);
-  y = gates(bodies, y, rng, 3);
-  y = pegGrid(bodies, y, rng, 4);
-  y = stickyShelves(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 3);
-  y = ringMaze(bodies, y, rng);
-  y = spinnerPair(bodies, spinners, y, rng);
+  y = pegField(bodies, y, rng, 4);
   y = gates(bodies, y, rng, 2);
-  y = diamondLattice(bodies, y, rng, 3);
+  y = serpentine(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 3);
+  y = ringCluster(bodies, y, rng);
+  y = diamonds(bodies, y, rng, 2);
   y = bounceZone(bodies, y, rng, 2);
-  y = pegGrid(bodies, y, rng, 3);
-  y = stickyShelves(bodies, y, rng, 2);
-  y = funnel(bodies, y, rng); // squeezes the field together right before the line
+  y = spinners(bodies, spinnerList, y, rng);
+  y = serpentine(bodies, y, rng, 3);
+  y = funnel(bodies, y, rng);
 
-  const finishY = y + 220;
+  const finishY = y + 200;
   const courseLength = finishY + 600;
 
   const wallOpts = { isStatic: true, label: 'wall', restitution: 0.3, friction: 0 };
@@ -207,9 +199,9 @@ export function buildCourse(rng) {
   bodies.push(Matter.Bodies.rectangle(W / 2, courseLength + 100, W * 2, 200, wallOpts));
 
   const clouds = [];
-  for (let cy = 200; cy < courseLength; cy += rng.range(380, 620)) {
-    clouds.push({ x: rng.range(60, W - 60), y: cy, s: rng.range(0.7, 1.5) });
+  for (let cy = 200; cy < courseLength; cy += rng.range(420, 680)) {
+    clouds.push({ x: rng.range(60, W - 60), y: cy, s: rng.range(0.7, 1.4) });
   }
 
-  return { bodies, spinners, finishY, courseLength, clouds };
+  return { bodies, spinners: spinnerList, finishY, courseLength, clouds };
 }
