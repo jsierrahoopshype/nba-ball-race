@@ -51,6 +51,8 @@ export function createRace(seed, ballConfigs) {
     for (const s of course.spinners) {
       Matter.Body.setAngle(s, s.angle + s.plugin.spinSpeed);
     }
+    // Update moving obstacles (pendulums, sliders): position = f(step), deterministic
+    for (const m of course.movers) m.update(race.step);
 
     const leaderBestY = Math.max(...balls.map(b => b.plugin.ball.bestY));
 

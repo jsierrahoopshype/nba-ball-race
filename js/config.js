@@ -5,13 +5,13 @@ export const CONFIG = {
   // Canvas / world
   WORLD_W: 1080,           // logical world + export width
   VIEW_H: 1920,            // logical canvas height (9:16)
-  ZOOM: 1.3,               // camera zoom. Visible world = (W/ZOOM) x (VIEW_H/ZOOM)
+  ZOOM: 1.0,               // 1.0 = full course width always in frame (no horizontal pan)
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
   GRAVITY_Y: 0.97,
-  BALL_RADIUS: 54,
-  BALL_RESTITUTION: 0.74,
+  BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
+  BALL_RESTITUTION: 0.82,
   BALL_FRICTION: 0.015,
   BALL_AIR_FRICTION: 0.006,
   MAX_SPEED: 40,           // px/step velocity cap: prevents tunneling through thin bodies

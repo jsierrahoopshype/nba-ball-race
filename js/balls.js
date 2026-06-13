@@ -26,8 +26,15 @@ export function contrastText(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#0B0B0F' : '#FFFFFF';
 }
 
+// More balls -> smaller balls, so a crowded field stays readable and has room
+// to move. 2 balls = 58px radius, 8 balls = 34px.
+export function ballRadiusForCount(n) {
+  return Math.max(34, Math.min(58, Math.round(58 - (n - 2) * 4)));
+}
+
 export function makeBalls(configs, rng) {
   const n = configs.length;
+  const radius = ballRadiusForCount(n);
   const slotW = Math.min(150, (CONFIG.WORLD_W - 220) / Math.max(1, n - 1));
   const startX = CONFIG.WORLD_W / 2 - slotW * (n - 1) / 2;
 
@@ -35,13 +42,13 @@ export function makeBalls(configs, rng) {
     const body = Matter.Bodies.circle(
       startX + i * slotW + rng.range(-6, 6),
       170 + rng.range(-10, 10),
-      CONFIG.BALL_RADIUS,
+      radius,
       {
         label: 'ball',
         restitution: CONFIG.BALL_RESTITUTION,
         friction: CONFIG.BALL_FRICTION,
         frictionAir: CONFIG.BALL_AIR_FRICTION,
-        density: 0.0011,
+        density: 0.0009, // a touch lighter than before: livelier ball-ball bounces
       }
     );
     body.plugin.ball = {
