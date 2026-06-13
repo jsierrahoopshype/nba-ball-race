@@ -22,17 +22,17 @@ const W = CONFIG.WORLD_W;
 
 function rect(x, y, w, h, opts = {}) {
   return Matter.Bodies.rectangle(x, y, w, h, {
-    isStatic: true, label: 'obstacle', restitution: 0.4, friction: 0.03, ...opts,
+    isStatic: true, label: 'obstacle', restitution: 0.42, friction: 0.008, ...opts,
   });
 }
 function peg(x, y, r, opts = {}) {
   return Matter.Bodies.circle(x, y, r, {
-    isStatic: true, label: 'obstacle', restitution: 0.62, friction: 0.02, ...opts,
+    isStatic: true, label: 'obstacle', restitution: 0.64, friction: 0.006, ...opts,
   });
 }
 
-function gridPegs(bodies, y, h, rng, r = 34, skipFn = null) {
-  const sx = 150, sy = 150, x0 = 175, x1 = W - 175;
+function gridPegs(bodies, y, h, rng, r = 32, skipFn = null) {
+  const sx = 184, sy = 150, x0 = 140, x1 = W - 140;
   let row = 0;
   for (let py = y + 40; py < y + h - 20; py += sy, row++) {
     const off = (row % 2 === 0) ? 0 : sx / 2;
@@ -47,7 +47,7 @@ function gridPegs(bodies, y, h, rng, r = 34, skipFn = null) {
 // ---- Static filler blocks ----------------------------------------------
 
 function pegField(bodies, y, rng, rows = 5) {
-  gridPegs(bodies, y, rows * 150 + 40, rng, 38);
+  gridPegs(bodies, y, rows * 150 + 40, rng, 36); // gap 184-72=112 > ball d100
   return y + rows * 150 + 140;
 }
 
@@ -133,7 +133,7 @@ function spinnersInField(bodies, spinnerList, y, rng) {
 }
 
 function bounceField(bodies, y, rng, rows = 3) {
-  const sx = 165, sy = 175, x0 = 175, x1 = W - 175;
+  const sx = 195, sy = 175, x0 = 150, x1 = W - 150; // gap 195-84=111 > d100
   for (let row = 0; row < rows; row++) {
     const off = (row % 2 === 0) ? 0 : sx / 2;
     for (let x = x0 + off; x <= x1; x += sx) {
@@ -166,8 +166,8 @@ function funnel(bodies, y, rng) {
 
 // Pendulum bars: rigid bars that swing from a fixed pivot, sweeping the lane and
 // batting balls sideways. Top end stays at the pivot; angle = amp*sin(step*spd).
-function pendulums(bodies, movers, y, rng, count = 3) {
-  const L = 300, barH = 26, h = 560;
+function pendulums(bodies, movers, y, rng, count = 4) {
+  const L = 360, barH = 28, h = 640;
   const pivotY = y + 120;
   for (let i = 0; i < count; i++) {
     const px = (count === 1) ? W / 2 : 200 + i * ((W - 400) / (count - 1));
@@ -196,7 +196,7 @@ function pendulums(bodies, movers, y, rng, count = 3) {
 // Sliding bars: horizontal bars that oscillate left-right across the lane,
 // offset in phase so the gaps shift like sliding doors.
 function sliders(bodies, movers, y, rng, count = 3) {
-  const barW = 360, barH = 34, sy = 200, h = count * sy + 60;
+  const barW = 440, barH = 36, sy = 200, h = count * sy + 60;
   for (let i = 0; i < count; i++) {
     const cy = y + 80 + i * sy;
     const base = (i % 2 === 0) ? W * 0.35 : W * 0.65;
@@ -217,6 +217,49 @@ function sliders(bodies, movers, y, rng, count = 3) {
   return y + h + 120;
 }
 
+// Wall deflectors: short ledges jutting from each wall, sloping DOWN toward the
+// center, staggered down both walls. They kill the side-gutter free-fall exploit
+// (a ball hugging a wall gets kicked back inward) without trapping: the inner end
+// is the low end, so balls always slide off it and drop back into play.
+function wallDeflectors(bodies, yTop, yBot, rng) {
+  const len = 300, hH = 26, spacing = 300, ang = 0.24;
+  let i = 0;
+  for (let y = yTop; y < yBot; y += spacing, i++) {
+    const left = (i % 2 === 0);
+    if (left) {
+      // wall end high (x small), inner end low: positive slope. Center placed so
+      // the bar spans x:[0..~290].
+      const cx = Math.cos(ang) * len / 2;
+      bodies.push(rect(cx, y + Math.sin(ang) * len / 2, len, hH, { angle: ang, restitution: 0.3, friction: 0.005 }));
+    } else {
+      const cx = W - Math.cos(ang) * len / 2;
+      bodies.push(rect(cx, y + Math.sin(ang) * len / 2, len, hH, { angle: -ang, restitution: 0.3, friction: 0.005 }));
+    }
+  }
+}
+
+// Rotating ring: a ring whose GAP sweeps around, so balls must time their exit.
+// Embedded in a peg field. Added to movers (angle = step * speed).
+function rotatingRing(bodies, movers, y, rng) {
+  const r = 210;
+  const cx = W / 2, cy = y + r + 60;
+  const segs = 30, gapHalf = 0.5;
+  const parts = [];
+  for (let k = 0; k < segs; k++) {
+    const a = (k / segs) * Math.PI * 2;
+    if (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) < gapHalf) continue;
+    const segLen = (2 * Math.PI * r / segs) * 1.2;
+    parts.push(Matter.Bodies.rectangle(cx + Math.cos(a) * r, cy + Math.sin(a) * r, segLen, 26, { angle: a + Math.PI / 2 }));
+  }
+  const ring = Matter.Body.create({ parts, isStatic: true, label: 'obstacle', restitution: 0.45, friction: 0.01 });
+  const spd = rng.pick([-1, 1]) * rng.range(0.008, 0.014);
+  bodies.push(ring);
+  movers.push({ body: ring, update(step) { Matter.Body.setAngle(ring, step * spd); } });
+  const h = r * 2 + 120;
+  gridPegs(bodies, y, h, rng, 32, (px, py) => Math.hypot(px - cx, py - cy) < r + 130);
+  return y + h + 120;
+}
+
 // ---- Assembly: dense, varied, longer -----------------------------------
 
 export function buildCourse(rng) {
@@ -224,20 +267,23 @@ export function buildCourse(rng) {
   let y = 360;
 
   y = pegField(bodies, y, rng, 4);
-  y = gates(bodies, y, rng, 2);
   y = dotsOnField(bodies, y, rng, 4);
   y = sliders(bodies, movers, y, rng, 3);
   y = ringsInField(bodies, y, rng, 2);
-  y = pendulums(bodies, movers, y, rng, 3);
-  y = stickyZone(bodies, y, rng, 2);
+  y = pendulums(bodies, movers, y, rng, 4);
+  y = rotatingRing(bodies, movers, y, rng);
   y = spinnersInField(bodies, spinnerList, y, rng);
   y = bounceField(bodies, y, rng, 3);
   y = diamondsOnField(bodies, y, rng, 2);
-  y = gates(bodies, y, rng, 2);
+  y = sliders(bodies, movers, y, rng, 4);
   y = dotsOnField(bodies, y, rng, 3);
-  y = sliders(bodies, movers, y, rng, 3);
+  y = pendulums(bodies, movers, y, rng, 3);
   y = pegField(bodies, y, rng, 4);
-  y = ringsInField(bodies, y, rng, 1);
+  y = ringsInField(bodies, y, rng, 2);
+  y = dotsOnField(bodies, y, rng, 4);
+  y = spinnersInField(bodies, spinnerList, y, rng);
+  y = pegField(bodies, y, rng, 4);
+  y = rotatingRing(bodies, movers, y, rng);
   y = funnel(bodies, y, rng);
 
   const finishY = y + 160;

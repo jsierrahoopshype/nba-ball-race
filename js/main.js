@@ -52,8 +52,8 @@ async function applyPick(i, raw, row) {
   row.classList.add('loading');
   try {
     if (player) {
-      const [short, , id] = player;
-      const img = await loadImage(HEADSHOT_URL(id));
+      const [short, , id, file] = player;
+      const img = await loadImage(HEADSHOT_URL(file));
       if (img) { setup.setImage(i, img, `player:${id}`); setup.setName(i, short); syncRow(row, i); }
       else status(`couldn't load ${player[1]} headshot (id may need a fix)`);
     } else if (team) {
@@ -133,9 +133,9 @@ function autoloadFaces() {
     if (b.image) return;
     const p = playerByShort.get((b.label || '').toUpperCase());
     if (!p) return;
-    loadImage(HEADSHOT_URL(p[2])).then(img => {
+    loadImage(HEADSHOT_URL(p[3])).then(img => {
       if (img && !setup.balls[i].image) {
-        setup.setImage(i, img, `player:${p[2]}`);
+        setup.setImage(i, img, `player:${p[2]}`); // p[2]=id, p[3]=filename
         const row = ballRowsEl.children[i];
         if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
       }
@@ -197,11 +197,12 @@ function loop(now) {
     }
   } else if (mode === 'finished') {
     winnerT += dt;
-    if (winnerT > 2.2) finishRecording();
+    if (winnerT > 3.2) finishRecording();
   }
 
-  const leader = race.standings()[0];
-  camera.update(leader.position.x, leader.plugin.ball.bestY);
+  const order = race.standings();
+  const active = order.find(b => !b.plugin.ball.finished) || order[order.length - 1];
+  camera.update(active.position.x, active.plugin.ball.bestY);
 
   drawWorld(ctx, race, camera);
   drawLeaderboard(ctx, race.standings());
@@ -211,8 +212,8 @@ function loop(now) {
   } else if (mode === 'racing' && race.step < 45) {
     drawCountdown(ctx, 0);
   } else if (mode === 'finished') {
-    drawWinner(ctx, race.winner, winnerT);
-    if (!recordingThisRace) status(`seed ${race.seed} | winner: ${race.winner.plugin.ball.label} | ${(race.step / 60).toFixed(1)}s`);
+    drawWinner(ctx, race.standings(), winnerT);
+    if (!recordingThisRace) status(`seed ${race.seed} | winner: ${race.winner.plugin.ball.label} | ${(race.winner.plugin.ball.finishStep / 60).toFixed(1)}s`);
   }
 }
 

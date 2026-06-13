@@ -12,8 +12,8 @@ export const CONFIG = {
   GRAVITY_Y: 0.97,
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.82,
-  BALL_FRICTION: 0.015,
-  BALL_AIR_FRICTION: 0.006,
+  BALL_FRICTION: 0.006,
+  BALL_AIR_FRICTION: 0.004,
   MAX_SPEED: 40,           // px/step velocity cap: prevents tunneling through thin bodies
 
   // Sticky surfaces: velocity multiplier applied every step while touching
@@ -32,5 +32,6 @@ export const CONFIG = {
   RUBBER_FORCE: 0.00075,
 
   // Race timing
-  HARD_TIMEOUT_S: 110,
+  HARD_TIMEOUT_S: 120,
+  TAIL_S: 14,              // after the winner finishes, force-place any ball still going
 };

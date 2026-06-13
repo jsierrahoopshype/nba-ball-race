@@ -29,7 +29,7 @@ export function contrastText(hex) {
 // More balls -> smaller balls, so a crowded field stays readable and has room
 // to move. 2 balls = 58px radius, 8 balls = 34px.
 export function ballRadiusForCount(n) {
-  return Math.max(34, Math.min(58, Math.round(58 - (n - 2) * 4)));
+  return Math.max(32, Math.min(50, Math.round(50 - (n - 2) * 3)));
 }
 
 export function makeBalls(configs, rng) {
@@ -62,6 +62,7 @@ export function makeBalls(configs, rng) {
       ghostSteps: 0,
       finished: false,
       finishStep: null,
+      place: null,
     };
     return body;
   });
