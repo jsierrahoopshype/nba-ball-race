@@ -9,7 +9,7 @@ export const CONFIG = {
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
-  GRAVITY_Y: 0.92,
+  GRAVITY_Y: 0.97,
   BALL_RADIUS: 54,
   BALL_RESTITUTION: 0.74,
   BALL_FRICTION: 0.015,
@@ -32,5 +32,5 @@ export const CONFIG = {
   RUBBER_FORCE: 0.00075,
 
   // Race timing
-  HARD_TIMEOUT_S: 150,
+  HARD_TIMEOUT_S: 110,
 };

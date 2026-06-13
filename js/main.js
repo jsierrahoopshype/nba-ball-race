@@ -121,8 +121,28 @@ function renderRows() {
   });
 }
 
-countSelect.addEventListener('change', () => { setup.setCount(parseInt(countSelect.value, 10)); renderRows(); });
+countSelect.addEventListener('change', () => { setup.setCount(parseInt(countSelect.value, 10)); renderRows(); autoloadFaces(); });
 renderRows();
+
+// Auto-load headshots for any ball whose label matches a known player short-name,
+// so default races show faces (like the reference) without the user picking.
+// Safe: a failed fetch leaves the color+initials fallback untouched.
+const playerByShort = new Map(PLAYERS.map(p => [p[0], p]));
+function autoloadFaces() {
+  setup.balls.forEach((b, i) => {
+    if (b.image) return;
+    const p = playerByShort.get((b.label || '').toUpperCase());
+    if (!p) return;
+    loadImage(HEADSHOT_URL(p[2])).then(img => {
+      if (img && !setup.balls[i].image) {
+        setup.setImage(i, img, `player:${p[2]}`);
+        const row = ballRowsEl.children[i];
+        if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
+      }
+    });
+  });
+}
+autoloadFaces();
 
 function status(msg) { statusEl.textContent = msg; }
 

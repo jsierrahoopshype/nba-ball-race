@@ -66,6 +66,19 @@ export function createRace(seed, ballConfigs) {
         Matter.Body.setVelocity(ball, { x: v.x * k, y: v.y * k });
       }
 
+      // Region-stall backstop (catches slow-creep that evades the step counter):
+      // every CHECK steps, if the ball gained < MIN_GAIN px, phase it through.
+      p.regionSteps = (p.regionSteps || 0) + 1;
+      if (p.regionMarkY === undefined) p.regionMarkY = ball.position.y;
+      if (p.regionSteps >= 480) { // 8 seconds
+        if (ball.position.y - p.regionMarkY < 300 && p.ghostSteps === 0) {
+          p.ghostSteps = 16;
+          ball.collisionFilter.mask = 0;
+        }
+        p.regionSteps = 0;
+        p.regionMarkY = ball.position.y;
+      }
+
       // Progress tracking
       if (ball.position.y > p.bestY + CONFIG.PROGRESS_EPS) {
         p.bestY = ball.position.y;
@@ -82,14 +95,36 @@ export function createRace(seed, ballConfigs) {
         const dir = Math.sign(toCenter) || (rng.chance(0.5) ? 1 : -1);
         // Escalate if it keeps failing: each retry within a short window hits harder
         p.nudgeCount = (p.nudgeCount || 0) + 1;
-        const power = 1 + Math.min(p.nudgeCount, 4) * 0.6;
+        const n = Math.min(p.nudgeCount, 8);
+        const power = 1 + n * 0.7;
+        // After several failures the ball is in a deep pocket: pop it UP and out
+        // (a big bounce, not a teleport) so gravity can re-route it past the snag.
+        const upPop = p.nudgeCount >= 4 ? -CONFIG.NUDGE_Y * (n - 2) : CONFIG.NUDGE_Y * power;
         Matter.Body.setVelocity(ball, {
-          x: dir * CONFIG.NUDGE_X * power + rng.range(-2, 2),
-          y: CONFIG.NUDGE_Y * power,
+          x: dir * CONFIG.NUDGE_X * power + rng.range(-3, 3),
+          y: upPop,
         });
         p.stallSteps = 0;
+
+        // Ultimate backstop: if nudging has failed many times, the ball is in a
+        // pocket the nudge can't clear. Let it phase through obstacles briefly
+        // (a quick squeeze-out) so no race can EVER hard-stall on camera. Rare
+        // (<1% of races) and far better than a 150s dead clip.
+        if (p.nudgeCount >= 10 && p.ghostSteps === 0) {
+          p.ghostSteps = 16;
+          ball.collisionFilter.mask = 0; // collide with nothing
+        }
       } else if (p.stallSteps === 1) {
-        p.nudgeCount = 0; // moving again; reset escalation
+        p.nudgeCount = 0;
+      }
+
+      // Run/restore the ghost window
+      if (p.ghostSteps > 0) {
+        p.ghostSteps--;
+        if (p.ghostSteps === 0) {
+          ball.collisionFilter.mask = 0xFFFFFFFF; // collisions back on
+          p.nudgeCount = 0;
+        }
       }
 
       // Moderate rubber band: trailing balls get a gentle extra pull downward

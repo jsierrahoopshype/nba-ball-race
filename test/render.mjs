@@ -9,22 +9,20 @@ const { drawLeaderboard } = await import('../js/hud.js');
 const { createCamera } = await import('../js/camera.js');
 const { CONFIG } = await import('../js/config.js');
 
-const configs = PALETTE.slice(0, 4).map((p, i) => ({ id: `b${i}`, label: ['LBJ','SC','KD','GIA'][i], color: p.color, textColor: p.text }));
-const race = createRace(98765, configs);
+const labels = ['LBJ','SC','KD','GIA','LUKA'];
+const configs = PALETTE.slice(0,5).map((p,i)=>({id:`b${i}`,label:labels[i],color:p.color,textColor:p.text}));
+const race = createRace(3646226548, configs);
 const camera = createCamera(race.course.courseLength);
 const canvas = createCanvas(CONFIG.WORLD_W, CONFIG.VIEW_H);
 const ctx = canvas.getContext('2d');
-
-const grabAt = [240, 720, 1500, 2280, 3000];
-let g = 0;
-for (let s = 0; s <= 9000 && !race.finished; s++) {
+// grab 8 frames spread across the race
+const total = (()=>{ const r=createRace(3646226548,configs); while(!r.finished) r.tick(); return r.step; })();
+const grabAt = Array.from({length:8},(_,i)=>Math.floor(total*(i+0.5)/8));
+let g=0;
+for (let s=0; s<=total && !race.finished; s++) {
   race.tick();
   const lead = race.standings()[0];
-  camera.update(lead.position.x, lead.plugin.ball.bestY, s === 1);
-  if (grabAt.includes(s)) {
-    drawWorld(ctx, race, camera);
-    drawLeaderboard(ctx, race.standings());
-    fs.writeFileSync(`test/frame_${g++}.png`, canvas.toBuffer('image/png'));
-  }
+  camera.update(lead.position.x, lead.plugin.ball.bestY, s===1);
+  if (grabAt.includes(s)) { drawWorld(ctx,race,camera); drawLeaderboard(ctx,race.standings()); fs.writeFileSync(`test/frame_${g++}.png`, canvas.toBuffer('image/png')); }
 }
-console.log('race finished at', (race.step/60).toFixed(1), 's');
+console.log('finished at', (race.step/60).toFixed(1),'s, frames:', g);

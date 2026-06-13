@@ -52,6 +52,7 @@ export function makeBalls(configs, rng) {
       image: cfg.image || null,    // HTMLImageElement (uploaded in the editor)
       bestY: body.position.y,
       stallSteps: 0,
+      ghostSteps: 0,
       finished: false,
       finishStep: null,
     };
