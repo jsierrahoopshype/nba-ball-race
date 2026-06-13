@@ -52,12 +52,15 @@ function pegField(bodies, y, rng, rows = 5) {
 }
 
 function dotsOnField(bodies, y, rng, rows = 4) {
-  const dotR = 56, dotSy = 200;
-  const A = [260, 540, 820], B = [400, 680];
+  const dotR = 56, dotSy = 200, h = rows * dotSy + 110;
+  const dots = [];
   for (let row = 0; row < rows; row++) {
-    for (const x of (row % 2 === 0 ? A : B)) bodies.push(peg(x, y + 60 + row * dotSy, dotR));
+    const xs = (row % 2 === 0) ? [260, 540, 820] : [150, 400, 680, 930]; // edge dots on B rows
+    for (const x of xs) { bodies.push(peg(x, y + 60 + row * dotSy, dotR)); dots.push({x, y: y + 60 + row * dotSy}); }
   }
-  return y + rows * dotSy + 110;
+  // staggered pegs fill remaining gaps incl. the side gutters (no clear margin)
+  gridPegs(bodies, y, h, rng, 30, (px, py) => dots.some(d => Math.hypot(px - d.x, py - d.y) < dotR + 55));
+  return y + h;
 }
 
 // Full-width bars, two seeded gaps per row. Bars are now bouncy (was dead/sluggish).
@@ -162,6 +165,150 @@ function funnel(bodies, y, rng) {
   return y + h + 120;
 }
 
+// Embudo (full-width funnel): two ramps span the ENTIRE width down to a center
+// hole. Every ball, even one hugging a wall, slides to the hole. This hard-gates
+// the field (slows + bunches the pack) and makes edge-diving impossible here.
+// Safe: ramps slope DOWN toward the hole, so the wall corner is the high point
+// (no pooling). Below the hole, a short lip on each side stops a straight shot.
+function embudo(bodies, y, rng) {
+  const holeW = rng.range(150, 200);
+  const cx = W / 2 + rng.range(-60, 60);
+  const rampLen = (W / 2) + 80;
+  const ang = 0.42;
+  const ry = y + 240;
+  // left ramp: wall end high, hole end low (slopes down toward the hole)
+  bodies.push(rect(cx - holeW / 2 - Math.cos(ang) * rampLen / 2, ry - Math.sin(ang) * rampLen / 2,
+                   rampLen, 40, { angle: ang, restitution: 0.3, friction: 0.01 }));
+  // right ramp: mirror
+  bodies.push(rect(cx + holeW / 2 + Math.cos(ang) * rampLen / 2, ry - Math.sin(ang) * rampLen / 2,
+                   rampLen, 40, { angle: -ang, restitution: 0.3, friction: 0.01 }));
+  // catch lips below the hole so balls can't laser straight into a side gutter
+  bodies.push(rect(cx - holeW / 2 - 110, ry + 150, 220, 34, { angle: 0.32, restitution: 0.3, friction: 0.02 }));
+  bodies.push(rect(cx + holeW / 2 + 110, ry + 150, 220, 34, { angle: -0.32, restitution: 0.3, friction: 0.02 }));
+  return y + 460;
+}
+
+// Turbine: a big 4-arm rotor (bigger, slower than a spinner) that sweeps the lane.
+function turbine(bodies, movers, y, rng) {
+  const cx = W / 2, cy = y + 320, arm = 360;
+  const parts = [];
+  for (let k = 0; k < 4; k++) parts.push(Matter.Bodies.rectangle(cx, cy, arm, 34, { angle: k * Math.PI / 4 }));
+  const rotor = Matter.Body.create({ parts, isStatic: true, label: 'obstacle', restitution: 0.6, friction: 0.03 });
+  const spd = rng.pick([-1, 1]) * rng.range(0.010, 0.016);
+  bodies.push(rotor);
+  movers.push({ body: rotor, update(step) { Matter.Body.setAngle(rotor, step * spd); } });
+  bodies.push(peg(cx, cy, 18));
+  // pegs around it (clear of the swept circle)
+  gridPegs(bodies, y, 640, rng, 30, (px, py) => Math.hypot(px - cx, py - cy) < arm / 2 + 70);
+  return y + 640 + 120;
+}
+
+// Pop-bumper cluster: pinball-style ACTIVE bumpers (very high restitution) that
+// fling balls. Adds chaos and keeps energy up without speeding the descent.
+function popBumpers(bodies, y, rng) {
+  const spots = [[270, 150], [540, 280], [810, 150], [400, 430], [680, 430]];
+  for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 1.45 }));
+  return y + 600;
+}
+
+// Zigzag chute: alternating baffles from each wall force a single-file S-path.
+// Big slowdown (balls queue). Channel openings >= 150px so no jam.
+function zigzagChute(bodies, y, rng, steps = 5) {
+  const baffleW = W * 0.66, baffleH = 30, sy = 230;
+  for (let i = 0; i < steps; i++) {
+    const left = i % 2 === 0;
+    const cx = left ? baffleW / 2 - 20 : W - baffleW / 2 + 20;
+    const tilt = (left ? 1 : -1) * 0.16; // slope toward the opening
+    bodies.push(rect(cx, y + 120 + i * sy, baffleW, baffleH, { angle: tilt, restitution: 0.25, friction: 0.01 }));
+  }
+  return y + steps * sy + 200;
+}
+
+// Spiral maze: nested ~300-degree arcs with offset openings. A ball winds around
+// each arc to its gap, drops inward, repeats, exiting at the center-bottom.
+function spiralMaze(bodies, y, rng) {
+  const cx = W / 2, cy = y + 360;
+  const radii = [320, 230, 140];
+  let gap = rng.range(0, Math.PI * 2);
+  for (const r of radii) {
+    const segs = Math.round(r / 9);
+    const gapHalf = 0.55;
+    for (let k = 0; k < segs; k++) {
+      const a = (k / segs) * Math.PI * 2;
+      let d = Math.abs(((a - gap + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (d < gapHalf) continue;
+      const segLen = (2 * Math.PI * r / segs) * 1.2;
+      bodies.push(rect(cx + Math.cos(a) * r, cy + Math.sin(a) * r, segLen, 24, { angle: a + Math.PI / 2, restitution: 0.35 }));
+    }
+    gap += Math.PI; // offset each ring's opening so the ball has to travel around
+  }
+  return y + 720 + 120;
+}
+
+// Trapdoors: a funnel to a center hole with a sliding DOOR that covers/uncovers
+// the hole on a timer. Balls pool on the funnel while shut, then drop when open.
+function trapdoors(bodies, movers, y, rng) {
+  const cx = W / 2, holeW = 200, ry = y + 240, rampLen = (W / 2) + 80, ang = 0.40;
+  bodies.push(rect(cx - holeW / 2 - Math.cos(ang) * rampLen / 2, ry - Math.sin(ang) * rampLen / 2, rampLen, 38, { angle: ang, restitution: 0.3, friction: 0.01 }));
+  bodies.push(rect(cx + holeW / 2 + Math.cos(ang) * rampLen / 2, ry - Math.sin(ang) * rampLen / 2, rampLen, 38, { angle: -ang, restitution: 0.3, friction: 0.01 }));
+  // the door: a bar that slides across the hole, fully clearing it when "open"
+  const door = Matter.Bodies.rectangle(cx, ry + 30, holeW + 40, 30, { isStatic: true, label: 'obstacle', restitution: 0.2, friction: 0.02 });
+  bodies.push(door);
+  const period = rng.range(150, 210); // steps per open/close cycle
+  movers.push({
+    body: door,
+    update(step) {
+      const open = (Math.floor(step / period) % 2) === 1;
+      // slide the door fully off to the side when open, back over the hole when shut
+      Matter.Body.setPosition(door, { x: open ? cx + W : cx, y: ry + 30 });
+    },
+  });
+  return y + 480;
+}
+
+// Conveyor: a wide near-flat belt that shoves balls sideways on contact (label
+// carries the push direction). Handled in physics via collisionActive.
+function conveyor(bodies, y, rng) {
+  const dir = rng.pick([-1, 1]);
+  const belt = rect(W / 2, y + 160, W - 220, 36, { angle: dir * 0.04, restitution: 0.1, friction: 0.2 });
+  belt.plugin.conveyor = dir * 7; // px/step horizontal push
+  bodies.push(belt);
+  // a wall on the push-side end so balls don't ride straight off into the gutter;
+  // they spill over a gap at the far end
+  return y + 360;
+}
+
+// Seesaw: a bar on a center pivot that tilts reactively as balls land on it
+// (dynamic body + revolute constraint). Deterministic under the fixed timestep.
+function seesaw(bodies, constraints, y, rng) {
+  const cx = W / 2, cy = y + 220;
+  const bar = Matter.Bodies.rectangle(cx, cy, 620, 34, {
+    label: 'obstacle', restitution: 0.3, friction: 0.05, density: 0.004,
+  });
+  bar.plugin.seesaw = true;
+  bodies.push(bar);
+  bodies.push(peg(cx, cy, 24)); // visual pivot
+  constraints.push(Matter.Constraint.create({
+    bodyA: bar, pointB: { x: cx, y: cy }, stiffness: 1, length: 0,
+  }));
+  return y + 440;
+}
+
+// Plinko nested funnels: a big funnel whose hole drops onto two smaller funnels,
+// splitting the field. Classic Plinko branching.
+function plinkoFunnels(bodies, y, rng) {
+  const ang = 0.46;
+  const big = (cx, yy, holeW, span) => {
+    const len = span;
+    bodies.push(rect(cx - holeW / 2 - Math.cos(ang) * len / 2, yy - Math.sin(ang) * len / 2, len, 34, { angle: ang, restitution: 0.3 }));
+    bodies.push(rect(cx + holeW / 2 + Math.cos(ang) * len / 2, yy - Math.sin(ang) * len / 2, len, 34, { angle: -ang, restitution: 0.3 }));
+  };
+  big(W / 2, y + 200, 180, W / 2 + 60);          // top funnel spanning full width
+  big(W * 0.28, y + 470, 150, W * 0.40);          // lower-left
+  big(W * 0.72, y + 470, 150, W * 0.40);          // lower-right
+  return y + 680;
+}
+
 // ---- MOVING obstacle blocks (deterministic, position = f(step)) ---------
 
 // Pendulum bars: rigid bars that swing from a fixed pivot, sweeping the lane and
@@ -263,28 +410,23 @@ function rotatingRing(bodies, movers, y, rng) {
 // ---- Assembly: dense, varied, longer -----------------------------------
 
 export function buildCourse(rng) {
-  const bodies = [], spinnerList = [], movers = [];
+  const bodies = [], spinnerList = [], movers = [], constraints = [];
   let y = 360;
 
-  y = pegField(bodies, y, rng, 4);
-  y = dotsOnField(bodies, y, rng, 4);
-  y = sliders(bodies, movers, y, rng, 3);
+  y = pegField(bodies, y, rng, 3);
+  y = embudo(bodies, y, rng);
+  y = zigzagChute(bodies, y, rng, 4);
   y = ringsInField(bodies, y, rng, 2);
-  y = pendulums(bodies, movers, y, rng, 4);
-  y = rotatingRing(bodies, movers, y, rng);
-  y = spinnersInField(bodies, spinnerList, y, rng);
-  y = bounceField(bodies, y, rng, 3);
-  y = diamondsOnField(bodies, y, rng, 2);
-  y = sliders(bodies, movers, y, rng, 4);
+  y = turbine(bodies, movers, y, rng);
+  y = conveyor(bodies, y, rng);
+  y = plinkoFunnels(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
+  y = spiralMaze(bodies, y, rng);
+  y = trapdoors(bodies, movers, y, rng);
+  y = seesaw(bodies, constraints, y, rng);
   y = dotsOnField(bodies, y, rng, 3);
   y = pendulums(bodies, movers, y, rng, 3);
-  y = pegField(bodies, y, rng, 4);
-  y = ringsInField(bodies, y, rng, 2);
-  y = dotsOnField(bodies, y, rng, 4);
-  y = spinnersInField(bodies, spinnerList, y, rng);
-  y = pegField(bodies, y, rng, 4);
-  y = rotatingRing(bodies, movers, y, rng);
-  y = funnel(bodies, y, rng);
+  y = embudo(bodies, y, rng);
 
   const finishY = y + 160;
   const courseLength = finishY + 600;
@@ -299,5 +441,5 @@ export function buildCourse(rng) {
     clouds.push({ x: rng.range(60, W - 60), y: cy, s: rng.range(0.6, 1.2) });
   }
 
-  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds };
+  return { bodies, spinners: spinnerList, movers, constraints, finishY, courseLength, clouds };
 }

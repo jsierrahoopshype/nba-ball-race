@@ -19,7 +19,8 @@ export function createSetup(initialCount = 2) {
         label: NAMES[i] || `P${i + 1}`,
         color: PALETTE[i % PALETTE.length].color,
         image: null,     // HTMLImageElement once a player/team/upload resolves
-        source: null,    // 'player:2544' | 'team:LAL' | 'upload' | null (for templates later)
+        source: null,
+        imageFit: 'cover',
       });
     }
     return balls.length;
@@ -33,7 +34,7 @@ export function createSetup(initialCount = 2) {
     setCount,
     setName: (i, v) => { if (balls[i]) balls[i].label = v; },
     setColor: (i, v) => { if (balls[i]) balls[i].color = v; },
-    setImage: (i, img, source) => { if (balls[i]) { balls[i].image = img; balls[i].source = source; } },
+    setImage: (i, img, source, fit) => { if (balls[i]) { balls[i].image = img; balls[i].source = source; balls[i].imageFit = fit || 'cover'; } },
     clearImage: (i) => { if (balls[i]) { balls[i].image = null; balls[i].source = null; } },
     // The exact array createRace() consumes. THIS is what RACE uses.
     toConfigs: () => balls.map((b, i) => ({
@@ -42,6 +43,7 @@ export function createSetup(initialCount = 2) {
       color: b.color,
       textColor: contrastText(b.color),
       image: b.image,
+      imageFit: b.imageFit || 'cover',
     })),
   };
 }

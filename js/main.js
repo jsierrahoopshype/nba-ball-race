@@ -54,12 +54,12 @@ async function applyPick(i, raw, row) {
     if (player) {
       const [short, , id, file] = player;
       const img = await loadImage(HEADSHOT_URL(file));
-      if (img) { setup.setImage(i, img, `player:${id}`); setup.setName(i, short); syncRow(row, i); }
+      if (img) { setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); syncRow(row, i); }
       else status(`couldn't load ${player[1]} headshot (id may need a fix)`);
     } else if (team) {
       const [abbr, name] = team;
       const img = await loadImage(TEAM_LOGO_URL(abbr));
-      if (img) { setup.setImage(i, img, `team:${abbr}`); setup.setName(i, abbr); syncRow(row, i); }
+      if (img) { setup.setImage(i, img, `team:${abbr}`, 'cover'); setup.setName(i, abbr); syncRow(row, i); }
       else status(`couldn't load ${name} logo`);
     }
   } finally {
@@ -106,7 +106,7 @@ function renderRows() {
     file.addEventListener('change', () => {
       const f = file.files[0]; if (!f) return;
       const img = new Image();
-      img.onload = () => { setup.setImage(i, img, 'upload'); chip.textContent = '✓'; };
+      img.onload = () => { setup.setImage(i, img, 'upload', 'cover'); chip.textContent = '✓'; };
       img.src = URL.createObjectURL(f);
     });
     const fileBtn = document.createElement('label');
@@ -135,7 +135,7 @@ function autoloadFaces() {
     if (!p) return;
     loadImage(HEADSHOT_URL(p[3])).then(img => {
       if (img && !setup.balls[i].image) {
-        setup.setImage(i, img, `player:${p[2]}`); // p[2]=id, p[3]=filename
+        setup.setImage(i, img, `player:${p[2]}`, 'face'); // p[2]=id, p[3]=filename
         const row = ballRowsEl.children[i];
         if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
       }

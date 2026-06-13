@@ -38,9 +38,18 @@ export function makeBalls(configs, rng) {
   const slotW = Math.min(150, (CONFIG.WORLD_W - 220) / Math.max(1, n - 1));
   const startX = CONFIG.WORLD_W / 2 - slotW * (n - 1) / 2;
 
+  // Seeded shuffle of start slots: the course can have a faster side, so we
+  // decorrelate ball identity from start position. Over many seeds every ball
+  // is equally likely to draw the good slot -> fair. Deterministic per seed.
+  const slots = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
+
   return configs.map((cfg, i) => {
     const body = Matter.Bodies.circle(
-      startX + i * slotW + rng.range(-6, 6),
+      startX + slots[i] * slotW + rng.range(-6, 6),
       170 + rng.range(-10, 10),
       radius,
       {
@@ -56,7 +65,8 @@ export function makeBalls(configs, rng) {
       label: (cfg.label || `P${i + 1}`).toUpperCase().slice(0, 4),
       color: cfg.color,
       textColor: cfg.textColor || contrastText(cfg.color),
-      image: cfg.image || null,    // HTMLImageElement (uploaded in the editor)
+      image: cfg.image || null,    // HTMLImageElement
+      imageFit: cfg.imageFit || 'cover', // 'face' for headshots, 'cover' for logos/uploads
       bestY: body.position.y,
       stallSteps: 0,
       ghostSteps: 0,

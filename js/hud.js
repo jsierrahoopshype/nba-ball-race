@@ -3,7 +3,7 @@
 // right-edge rail where platform UI sits.
 
 import { CONFIG } from './config.js';
-import { drawImageCover } from './draw.js';
+import { drawBallImage } from './draw.js';
 
 const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
 
@@ -30,7 +30,7 @@ export function drawLeaderboard(ctx, standings) {
       ctx.beginPath();
       ctx.arc(x + r, y, r, 0, Math.PI * 2);
       ctx.clip();
-      drawImageCover(ctx, p.image, x, y - r, r * 2);
+      drawBallImage(ctx, p, x, y - r, r * 2);
       ctx.restore();
     } else {
       ctx.fillStyle = p.textColor;
@@ -95,7 +95,7 @@ export function drawWinner(ctx, standings, t) {
   if (p.image) {
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-    drawImageCover(ctx, p.image, cx - r, cy - r, r * 2);
+    drawBallImage(ctx, p, cx - r, cy - r, r * 2);
     ctx.restore();
   } else {
     ctx.fillStyle = p.textColor;
@@ -134,7 +134,7 @@ export function drawWinner(ctx, standings, t) {
     ctx.lineWidth = 4; ctx.strokeStyle = i < 3 ? medals[i] : 'rgba(255,255,255,0.8)'; ctx.stroke();
     if (rb.image) {
       ctx.save(); ctx.beginPath(); ctx.arc(lx, y, rr, 0, Math.PI * 2); ctx.clip();
-      drawImageCover(ctx, rb.image, lx - rr, y - rr, rr * 2); ctx.restore();
+      drawBallImage(ctx, rb, lx - rr, y - rr, rr * 2); ctx.restore();
     } else {
       ctx.fillStyle = rb.textColor;
       ctx.font = `800 ${Math.round(rr * 0.7)}px system-ui, sans-serif`;

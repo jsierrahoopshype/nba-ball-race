@@ -9,7 +9,7 @@ export const CONFIG = {
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
-  GRAVITY_Y: 0.97,
+  GRAVITY_Y: 1.02,
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.82,
   BALL_FRICTION: 0.006,

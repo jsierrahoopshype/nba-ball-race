@@ -22,6 +22,21 @@ export function createRace(seed, ballConfigs) {
   const course = buildCourse(rng);
   const balls = makeBalls(ballConfigs, rng);
   Matter.Composite.add(engine.world, [...course.bodies, ...balls]);
+  if (course.constraints && course.constraints.length) {
+    Matter.Composite.add(engine.world, course.constraints);
+  }
+
+  // Conveyor belts: shove balls sideways on contact (label-driven, deterministic).
+  Matter.Events.on(engine, 'collisionActive', (ev) => {
+    for (const pair of ev.pairs) {
+      const a = pair.bodyA, b = pair.bodyB;
+      const ball = a.label === 'ball' ? a : (b.label === 'ball' ? b : null);
+      const other = ball === a ? b : a;
+      if (!ball) continue;
+      const push = other.plugin && other.plugin.conveyor;
+      if (push) Matter.Body.setVelocity(ball, { x: push, y: ball.velocity.y });
+    }
+  });
 
   const race = {
     seed, engine, balls, course,
@@ -47,6 +62,14 @@ export function createRace(seed, ballConfigs) {
 
     for (const s of course.spinners) Matter.Body.setAngle(s, s.angle + s.plugin.spinSpeed);
     for (const m of course.movers) m.update(race.step);
+
+    // Keep the seesaw bar a seesaw: clamp tilt so it can't spin all the way over.
+    for (const body of course.bodies) {
+      if (body.plugin && body.plugin.seesaw) {
+        if (body.angle > 0.5) { Matter.Body.setAngle(body, 0.5); Matter.Body.setAngularVelocity(body, 0); }
+        if (body.angle < -0.5) { Matter.Body.setAngle(body, -0.5); Matter.Body.setAngularVelocity(body, 0); }
+      }
+    }
 
     for (const ball of balls) {
       const p = ball.plugin.ball;

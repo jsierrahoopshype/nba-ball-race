@@ -7,11 +7,28 @@ const SKY_TOP = '#7dd0f7';
 const SKY_BOTTOM = '#5cb8ec';
 const OBSTACLE = '#15151a';
 
-// Square center-crop of any image into a circle area (headshots are not square)
+// Square center-crop of any image (logos, uploads) into a circle area.
 export function drawImageCover(ctx, img, x, y, size) {
   const s = Math.min(img.width, img.height);
   const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
   ctx.drawImage(img, sx, sy, s, s, x, y, size, size);
+}
+
+// Face-fit crop for NBA headshots: their face content sits in the center ~60%
+// with transparent sides and the head fills the height, so a plain square crop
+// reads as a narrow strip. This crops a square biased toward the face and fills
+// the circle with it.
+export function drawFace(ctx, img, x, y, size) {
+  const side = Math.min(img.width, img.height) * 0.80;
+  const sx = img.width * 0.5 - side / 2;
+  const sy = img.height * 0.44 - side / 2;
+  ctx.drawImage(img, sx, sy, side, side, x, y, size, size);
+}
+
+// Pick the right fit for a ball's image.
+export function drawBallImage(ctx, p, x, y, size) {
+  if (p.imageFit === 'face') drawFace(ctx, p.image, x, y, size);
+  else drawImageCover(ctx, p.image, x, y, size);
 }
 
 export function drawWorld(ctx, race, cam) {
@@ -101,14 +118,12 @@ export function drawBall(ctx, ball) {
   ctx.restore();
 
   if (p.image) {
-    // Headshot clipped into the circle, rotating with the body (meme physics)
+    // Face/logo stays UPRIGHT regardless of ball spin (clipped to the circle).
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.clip();
-    ctx.translate(x, y);
-    ctx.rotate(ball.angle);
-    drawImageCover(ctx, p.image, -r, -r, r * 2);
+    drawBallImage(ctx, p, x - r, y - r, r * 2);
     ctx.restore();
   } else {
     ctx.fillStyle = p.textColor;
