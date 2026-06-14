@@ -44,7 +44,71 @@ function gridPegs(bodies, y, h, rng, r = 32, skipFn = null) {
   }
 }
 
+// Round wall posts down both margins so a ball can't free-fall the edge, but
+// being round they just deflect it inward (no V-notch to wedge in). Global pass.
+function edgePosts(bodies, yTop, yBot, rng) {
+  const R = 74, spacing = 230;
+  let i = 0;
+  for (let yy = yTop; yy < yBot; yy += spacing, i++) {
+    if (i % 2 === 0) bodies.push(peg(64, yy, R, { restitution: 0.45 }));
+    else bodies.push(peg(W - 64, yy + spacing / 2, R, { restitution: 0.45 }));
+  }
+}
+
 // ---- Static filler blocks ----------------------------------------------
+
+// Reference-style BLOB CHANNEL: a full-width mass of big overlapping circles with
+// a wide serpentine channel carved through it. Rounded walls + a wide, roughly
+// constant gap mean balls flow down smoothly and cannot wedge or bridge (the
+// failure mode of thin bars and narrow funnel holes). This is the signature look.
+function blobChannel(bodies, y, rng, rows = 12) {
+  const R = 82, sx = 104, sy = 96, halfGap = 250; // dense overlap = smooth blob surface, no saddles
+  const amp = rng.range(70, 115), freq = rng.range(0.006, 0.010), phase = rng.range(0, 6.28); // gentle bends, free flow
+  const h = rows * sy + 80;
+  for (let r = 0; r < rows; r++) {
+    const yy = y + 60 + r * sy;
+    const cx = W / 2 + amp * Math.sin((y + r * sy) * freq + phase);
+    const off = (r % 2) ? sx / 2 : 0;
+    for (let x = -10 + off; x <= W + 10; x += sx) {
+      if (Math.abs(x - cx) < halfGap) continue; // carve the wide flowing channel
+      bodies.push(peg(x, yy, R, { restitution: 0.4, friction: 0.004 }));
+    }
+  }
+  return y + h + 90;
+}
+
+// Big dots, generously spaced and staggered (reference frames 5-6). Edge dots
+// sit against the walls so the margins aren't a clear drop. Round + wide-spaced,
+// so balls cascade through without jamming.
+function bigDots(bodies, y, rng, rows = 4) {
+  const R = 72, sy = 210, sx = 268;
+  for (let r = 0; r < rows; r++) {
+    const off = (r % 2) ? sx / 2 : 0;
+    for (let x = 95 + off; x <= W - 95; x += sx) {
+      bodies.push(peg(x + rng.range(-10, 10), y + 70 + r * sy, R, { restitution: 0.5 }));
+    }
+  }
+  return y + rows * sy + 120;
+}
+
+// Big smooth domes (reference's rounded caps): balls roll up and over, shedding
+// to either side. Convex only, so nothing pools. Gap fully open below.
+function archRamps(bodies, y, rng, count = 2) {
+  const h = 620;
+  for (let i = 0; i < count; i++) {
+    const cx = rng.range(330, 750);
+    const cy = y + 260 + i * 280;
+    const radius = rng.range(210, 280);
+    const segs = Math.round(radius / 11);
+    for (let k = 0; k <= segs; k++) {
+      const a = Math.PI + (k / segs) * Math.PI; // top semicircle, left to right
+      const px = cx + Math.cos(a) * radius, py = cy + Math.sin(a) * radius;
+      const segLen = (Math.PI * radius / segs) * 1.25;
+      bodies.push(rect(px, py, segLen, 24, { angle: a + Math.PI / 2, restitution: 0.42 }));
+    }
+  }
+  return y + h + 100;
+}
 
 function pegField(bodies, y, rng, rows = 5) {
   gridPegs(bodies, y, rows * 150 + 40, rng, 36); // gap 184-72=112 > ball d100
@@ -416,23 +480,36 @@ export function buildCourse(rng) {
   const bodies = [], spinnerList = [], movers = [];
   let y = 360;
 
-  y = pegField(bodies, y, rng, 3);
-  y = embudo(bodies, y, rng);
-  y = zigzagChute(bodies, y, rng, 4);
-  y = ringsInField(bodies, y, rng, 2);
-  y = turbine(bodies, movers, y, rng);
-  y = conveyor(bodies, y, rng);
-  y = plinkoFunnels(bodies, y, rng);
-  y = popBumpers(bodies, y, rng);
-  y = spiralMaze(bodies, y, rng);
-  y = trapdoors(bodies, movers, y, rng);
-  y = seesaw(bodies, movers, y, rng);
-  y = dotsOnField(bodies, y, rng, 3);
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
   y = pendulums(bodies, movers, y, rng, 3);
-  y = embudo(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
+  y = turbine(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = sliders(bodies, movers, y, rng, 3);
+  y = bigDots(bodies, y, rng, 3);
+  y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
+  y = seesaw(bodies, movers, y, rng);
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
+  y = pendulums(bodies, movers, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
+  y = turbine(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = sliders(bodies, movers, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
+  y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
+  y = popBumpers(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
 
   const finishY = y + 160;
   const courseLength = finishY + 600;
+
+  // (edge posts temporarily disabled for isolation)
 
   const wallOpts = { isStatic: true, label: 'wall', restitution: 0.3, friction: 0 };
   bodies.push(Matter.Bodies.rectangle(-40, courseLength / 2, 80, courseLength + 800, wallOpts));

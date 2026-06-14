@@ -88,16 +88,19 @@ export function createRace(seed, ballConfigs) {
         }
       }
 
-      // Anti-settle micro-liveliness (replaces the old visible "bump"): while a
-      // ball is nearly stationary, apply a tiny seeded impulse, downward-biased,
-      // every frame. Too small to read as a pop; it just means balls never sit
-      // perfectly still in a saddle, so they always creep off and keep flowing.
+      // Anti-settle: while nearly stationary, nudge with a downward-biased seeded
+      // impulse that RAMPS UP the longer it stays slow, so a ball that lands in a
+      // saddle pops free within ~1s instead of creeping visibly for many seconds.
       const sp = Math.hypot(ball.velocity.x, ball.velocity.y);
       if (sp < 1.2) {
+        p.slowSteps = (p.slowSteps || 0) + 1;
+        const ramp = Math.min(1, p.slowSteps / 36); // 0 -> 1 over ~0.6s
         Matter.Body.setVelocity(ball, {
-          x: ball.velocity.x + rng.range(-1.1, 1.1),
-          y: ball.velocity.y + rng.range(0.3, 1.3),
+          x: ball.velocity.x + rng.range(-1.1, 1.1) * (0.5 + ramp),
+          y: ball.velocity.y + rng.range(0.4, 1.2) + ramp * 3.2,
         });
+      } else {
+        p.slowSteps = 0;
       }
 
       // Silent last-resort insurance only: if a ball still gains almost nothing

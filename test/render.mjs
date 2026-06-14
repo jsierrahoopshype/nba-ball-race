@@ -1,1 +1,1 @@
-// placeholder kept minimal; render harness regenerated per session
+// render harness regenerated per session as needed
