@@ -55,6 +55,25 @@ function edgePosts(bodies, yTop, yBot, rng) {
   }
 }
 
+// Edge guards for OPEN blocks: a near-solid column of dots at x=95 / W-95, the
+// SAME column the dot fields use, so they're collinear (never form a saddle with
+// a neighbor) and just block the margin so balls can't free-fall the side.
+// Sparse big-dot scatter across the FULL width (reaches the walls) that skips
+// around a central feature. Fills the side margins so balls can't free-fall the
+// edge, while the skip-zone keeps dots off the feature so no pocket forms. Round
+// + wide-spaced (gap ~119px > ball) so balls pass through, nothing wedges.
+function scatterDots(bodies, y, h, rng, skip) {
+  const R = 58, sx = 235, sy = 205, x0 = 92, x1 = W - 92;
+  let row = 0;
+  for (let yy = y + 70; yy < y + h - 40; yy += sy, row++) {
+    const off = (row % 2) ? sx / 2 : 0;
+    for (let x = x0 + off; x <= x1; x += sx) {
+      if (skip && skip(x, yy)) continue;
+      bodies.push(peg(x + rng.range(-8, 8), yy, R, { restitution: 0.5 }));
+    }
+  }
+}
+
 // ---- Static filler blocks ----------------------------------------------
 
 // Reference-style BLOB CHANNEL: a full-width mass of big overlapping circles with
@@ -95,10 +114,12 @@ function bigDots(bodies, y, rng, rows = 4) {
 // to either side. Convex only, so nothing pools. Gap fully open below.
 function archRamps(bodies, y, rng, count = 2) {
   const h = 620;
+  const domes = [];
   for (let i = 0; i < count; i++) {
     const cx = rng.range(330, 750);
     const cy = y + 260 + i * 280;
     const radius = rng.range(210, 280);
+    domes.push({ cx, cy, radius });
     const segs = Math.round(radius / 11);
     for (let k = 0; k <= segs; k++) {
       const a = Math.PI + (k / segs) * Math.PI; // top semicircle, left to right
@@ -107,6 +128,7 @@ function archRamps(bodies, y, rng, count = 2) {
       bodies.push(rect(px, py, segLen, 24, { angle: a + Math.PI / 2, restitution: 0.42 }));
     }
   }
+  scatterDots(bodies, y, h, rng, (x, yy) => domes.some(d => Math.hypot(x - d.cx, yy - d.cy) < d.radius + 105));
   return y + h + 100;
 }
 
@@ -271,6 +293,7 @@ function turbine(bodies, movers, y, rng) {
 function popBumpers(bodies, y, rng) {
   const spots = [[270, 150], [540, 280], [810, 150], [400, 430], [680, 430]];
   for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 1.45 }));
+  scatterDots(bodies, y, 600, rng, (x, yy) => spots.some(([sx, dy]) => Math.hypot(x - sx, yy - (y + dy)) < 150));
   return y + 600;
 }
 
@@ -484,18 +507,14 @@ export function buildCourse(rng) {
   y = bigDots(bodies, y, rng, 4);
   y = pendulums(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
-  y = archRamps(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 3);
   y = turbine(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 4);
-  y = sliders(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 3);
-  y = ringsInField(bodies, y, rng, 2);
+  y = sliders(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
+  y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
   y = seesaw(bodies, movers, y, rng);
   y = archRamps(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 4);
-  y = pendulums(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
   y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 4);

@@ -9,9 +9,9 @@ export const CONFIG = {
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
-  GRAVITY_Y: 0.68,
+  GRAVITY_Y: 0.6,
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
-  BALL_RESTITUTION: 0.55,   // marble: crisp, modest bounce (not bouncy plastic)
+  BALL_RESTITUTION: 0.55,   // marble: crisp, modest bounce   // marble: crisp, modest bounce (not bouncy plastic)
   BALL_FRICTION: 0.002,    // marble glides
   BALL_AIR_FRICTION: 0.0025,
   MAX_SPEED: 40,           // px/step velocity cap: prevents tunneling through thin bodies
