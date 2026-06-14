@@ -22,9 +22,6 @@ export function createRace(seed, ballConfigs) {
   const course = buildCourse(rng);
   const balls = makeBalls(ballConfigs, rng);
   Matter.Composite.add(engine.world, [...course.bodies, ...balls]);
-  if (course.constraints && course.constraints.length) {
-    Matter.Composite.add(engine.world, course.constraints);
-  }
 
   // Conveyor belts: shove balls sideways on contact (label-driven, deterministic).
   Matter.Events.on(engine, 'collisionActive', (ev) => {
@@ -63,13 +60,6 @@ export function createRace(seed, ballConfigs) {
     for (const s of course.spinners) Matter.Body.setAngle(s, s.angle + s.plugin.spinSpeed);
     for (const m of course.movers) m.update(race.step);
 
-    // Keep the seesaw bar a seesaw: clamp tilt so it can't spin all the way over.
-    for (const body of course.bodies) {
-      if (body.plugin && body.plugin.seesaw) {
-        if (body.angle > 0.5) { Matter.Body.setAngle(body, 0.5); Matter.Body.setAngularVelocity(body, 0); }
-        if (body.angle < -0.5) { Matter.Body.setAngle(body, -0.5); Matter.Body.setAngularVelocity(body, 0); }
-      }
-    }
 
     for (const ball of balls) {
       const p = ball.plugin.ball;
@@ -85,6 +75,18 @@ export function createRace(seed, ballConfigs) {
 
       // Progress tracking (for camera + standings ordering)
       if (ball.position.y > p.bestY) p.bestY = ball.position.y;
+
+      // Thriller finish: in the final stretch, trailing balls get a gentle extra
+      // pull scaled by how far behind the leader they are, so the pack bunches and
+      // the lead can change in the last second. Subtle enough to look natural.
+      if (ball.position.y > course.finishY * CONFIG.SURGE_ZONE) {
+        const leadY = Math.max(...balls.map(bb => bb.position.y));
+        const behind = leadY - ball.position.y;
+        if (behind > 120) {
+          Matter.Body.applyForce(ball, ball.position,
+            { x: 0, y: CONFIG.SURGE_FORCE * ball.mass * Math.min(1, behind / 1400) });
+        }
+      }
 
       // Anti-settle micro-liveliness (replaces the old visible "bump"): while a
       // ball is nearly stationary, apply a tiny seeded impulse, downward-biased,

@@ -57,12 +57,13 @@ export function makeBalls(configs, rng) {
         restitution: CONFIG.BALL_RESTITUTION,
         friction: CONFIG.BALL_FRICTION,
         frictionAir: CONFIG.BALL_AIR_FRICTION,
-        density: 0.0009, // a touch lighter than before: livelier ball-ball bounces
+        density: 0.0017, // marble: heavy, carries momentum
       }
     );
     body.plugin.ball = {
       id: cfg.id || `b${i + 1}`,
-      label: (cfg.label || `P${i + 1}`).toUpperCase().slice(0, 4),
+      label: (cfg.label || `P${i + 1}`).toUpperCase().slice(0, 5),
+      name: cfg.name || (cfg.label || `P${i + 1}`),
       color: cfg.color,
       textColor: cfg.textColor || contrastText(cfg.color),
       image: cfg.image || null,    // HTMLImageElement

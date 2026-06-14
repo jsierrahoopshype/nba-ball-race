@@ -33,6 +33,7 @@ export function createSetup(initialCount = 2) {
     get balls() { return balls; },
     setCount,
     setName: (i, v) => { if (balls[i]) balls[i].label = v; },
+    setFullName: (i, v) => { if (balls[i]) balls[i].name = v; },
     setColor: (i, v) => { if (balls[i]) balls[i].color = v; },
     setImage: (i, img, source, fit) => { if (balls[i]) { balls[i].image = img; balls[i].source = source; balls[i].imageFit = fit || 'cover'; } },
     clearImage: (i) => { if (balls[i]) { balls[i].image = null; balls[i].source = null; } },
@@ -40,6 +41,7 @@ export function createSetup(initialCount = 2) {
     toConfigs: () => balls.map((b, i) => ({
       id: `b${i + 1}`,
       label: (b.label || `P${i + 1}`),
+      name: b.name || b.label || `P${i + 1}`,
       color: b.color,
       textColor: contrastText(b.color),
       image: b.image,

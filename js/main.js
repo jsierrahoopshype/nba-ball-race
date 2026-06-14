@@ -54,7 +54,7 @@ async function applyPick(i, raw, row) {
     if (player) {
       const [short, , id, file] = player;
       const img = await loadImage(HEADSHOT_URL(file));
-      if (img) { setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); syncRow(row, i); }
+      if (img) { setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); setup.setFullName(i, player[1].split(' ').slice(-1)[0]); syncRow(row, i); }
       else status(`couldn't load ${player[1]} headshot (id may need a fix)`);
     } else if (team) {
       const [abbr, name] = team;
@@ -135,7 +135,7 @@ function autoloadFaces() {
     if (!p) return;
     loadImage(HEADSHOT_URL(p[3])).then(img => {
       if (img && !setup.balls[i].image) {
-        setup.setImage(i, img, `player:${p[2]}`, 'face'); // p[2]=id, p[3]=filename
+        setup.setImage(i, img, `player:${p[2]}`, 'face'); setup.setFullName(i, p[1].split(' ').slice(-1)[0]); // p[1]=full name
         const row = ballRowsEl.children[i];
         if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
       }

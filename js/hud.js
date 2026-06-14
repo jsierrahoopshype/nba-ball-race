@@ -7,49 +7,57 @@ import { drawBallImage } from './draw.js';
 
 const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
 
-// Live Top 3, pinned top-left. Small stacked discs with rank numbers.
+// Live Top 3, compact, pinned top-left: small face + rank + NAME, on a slim
+// translucent panel so it reads over any background without eating the corner.
 export function drawLeaderboard(ctx, standings) {
   const top = standings.slice(0, 3);
-  const x = 56, startY = 150, gap = 118, r = 42;
+  const x = 40, startY = 130, rowH = 84, r = 30, panelW = 360;
 
   ctx.save();
+  ctx.fillStyle = 'rgba(12,14,20,0.42)';
+  roundRect(ctx, x - 14, startY - r - 16, panelW, rowH * top.length + 18, 20);
+  ctx.fill();
+
   for (let i = 0; i < top.length; i++) {
     const p = top[i].plugin.ball;
-    const y = startY + i * gap;
+    const cyc = startY + i * rowH;
 
-    ctx.beginPath();
-    ctx.arc(x + r, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = p.color;
-    ctx.fill();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.9)';
-    ctx.stroke();
+    ctx.fillStyle = i === 0 ? '#ffd34d' : '#ffffff';
+    ctx.font = '800 38px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), x + 16, cyc);
 
+    const fx = x + 56;
+    ctx.beginPath(); ctx.arc(fx + r, cyc, r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.85)'; ctx.stroke();
     if (p.image) {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(x + r, y, r, 0, Math.PI * 2);
-      ctx.clip();
-      drawBallImage(ctx, p, x, y - r, r * 2);
+      ctx.beginPath(); ctx.arc(fx + r, cyc, r, 0, Math.PI * 2); ctx.clip();
+      drawBallImage(ctx, p, fx, cyc - r, r * 2);
       ctx.restore();
     } else {
       ctx.fillStyle = p.textColor;
       ctx.font = `800 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(p.label, x + r, y + 1);
+      ctx.fillText(p.label, fx + r, cyc + 1);
     }
 
-    // Rank badge
-    ctx.beginPath();
-    ctx.arc(x + r - 34, y - 30, 19, 0, Math.PI * 2);
-    ctx.fillStyle = '#15151a';
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = '800 24px system-ui, sans-serif';
-    ctx.fillText(String(i + 1), x + r - 34, y - 29);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 38px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(p.name || p.label, fx + r * 2 + 18, cyc);
   }
   ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 // Countdown numbers + GO. t goes 3 -> 0; each unit is one beat.
@@ -107,7 +115,7 @@ export function drawWinner(ctx, standings, t) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd34d';
   ctx.font = '900 84px system-ui, sans-serif';
-  ctx.fillText(`${p.label} WINS`, cx, H * 0.41);
+  ctx.fillText(`${(p.name || p.label).toUpperCase()} WINS`, cx, H * 0.41);
 
   // Standings list, staggered reveal (each row fades in slightly after the prior)
   const rows = standings.slice(0, Math.min(8, standings.length));
@@ -145,7 +153,7 @@ export function drawWinner(ctx, standings, t) {
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 52px system-ui, sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(rb.label, lx + rr + 30, y);
+    ctx.fillText(rb.name || rb.label, lx + rr + 30, y);
     ctx.globalAlpha = 1;
   }
   ctx.restore();

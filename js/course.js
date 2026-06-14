@@ -22,12 +22,12 @@ const W = CONFIG.WORLD_W;
 
 function rect(x, y, w, h, opts = {}) {
   return Matter.Bodies.rectangle(x, y, w, h, {
-    isStatic: true, label: 'obstacle', restitution: 0.42, friction: 0.008, ...opts,
+    isStatic: true, label: 'obstacle', restitution: 0.34, friction: 0.006, ...opts,
   });
 }
 function peg(x, y, r, opts = {}) {
   return Matter.Bodies.circle(x, y, r, {
-    isStatic: true, label: 'obstacle', restitution: 0.64, friction: 0.006, ...opts,
+    isStatic: true, label: 'obstacle', restitution: 0.42, friction: 0.005, ...opts,
   });
 }
 
@@ -171,7 +171,7 @@ function funnel(bodies, y, rng) {
 // Safe: ramps slope DOWN toward the hole, so the wall corner is the high point
 // (no pooling). Below the hole, a short lip on each side stops a straight shot.
 function embudo(bodies, y, rng) {
-  const holeW = rng.range(150, 200);
+  const holeW = rng.range(190, 240);
   const cx = W / 2 + rng.range(-60, 60);
   const rampLen = (W / 2) + 80;
   const ang = 0.42;
@@ -182,9 +182,8 @@ function embudo(bodies, y, rng) {
   // right ramp: mirror
   bodies.push(rect(cx + holeW / 2 + Math.cos(ang) * rampLen / 2, ry - Math.sin(ang) * rampLen / 2,
                    rampLen, 40, { angle: -ang, restitution: 0.3, friction: 0.01 }));
-  // catch lips below the hole so balls can't laser straight into a side gutter
-  bodies.push(rect(cx - holeW / 2 - 110, ry + 150, 220, 34, { angle: 0.32, restitution: 0.3, friction: 0.02 }));
-  bodies.push(rect(cx + holeW / 2 + 110, ry + 150, 220, 34, { angle: -0.32, restitution: 0.3, friction: 0.02 }));
+  // (No catch-lips: two converging bars below a hole form an undrained V that
+  // traps balls. The clean V above drains through the hole; that's enough.)
   return y + 460;
 }
 
@@ -278,19 +277,23 @@ function conveyor(bodies, y, rng) {
   return y + 360;
 }
 
-// Seesaw: a bar on a center pivot that tilts reactively as balls land on it
-// (dynamic body + revolute constraint). Deterministic under the fixed timestep.
-function seesaw(bodies, constraints, y, rng) {
+// Seesaw: a center-pivoted bar that tilts smoothly back and forth on a timer
+// (kinematic, set each step). The earlier dynamic version vibrated; this is a
+// clean, deterministic see-saw motion that still bats balls left/right.
+function seesaw(bodies, movers, y, rng) {
   const cx = W / 2, cy = y + 220;
   const bar = Matter.Bodies.rectangle(cx, cy, 620, 34, {
-    label: 'obstacle', restitution: 0.3, friction: 0.05, density: 0.004,
+    isStatic: true, label: 'obstacle', restitution: 0.35, friction: 0.04,
   });
-  bar.plugin.seesaw = true;
   bodies.push(bar);
-  bodies.push(peg(cx, cy, 24)); // visual pivot
-  constraints.push(Matter.Constraint.create({
-    bodyA: bar, pointB: { x: cx, y: cy }, stiffness: 1, length: 0,
-  }));
+  bodies.push(peg(cx, cy, 22)); // visual pivot
+  const amp = rng.range(0.28, 0.4);
+  const spd = rng.range(0.02, 0.03);
+  const phase = rng.range(0, Math.PI * 2);
+  movers.push({
+    body: bar,
+    update(step) { Matter.Body.setAngle(bar, amp * Math.sin(step * spd + phase)); },
+  });
   return y + 440;
 }
 
@@ -410,7 +413,7 @@ function rotatingRing(bodies, movers, y, rng) {
 // ---- Assembly: dense, varied, longer -----------------------------------
 
 export function buildCourse(rng) {
-  const bodies = [], spinnerList = [], movers = [], constraints = [];
+  const bodies = [], spinnerList = [], movers = [];
   let y = 360;
 
   y = pegField(bodies, y, rng, 3);
@@ -423,7 +426,7 @@ export function buildCourse(rng) {
   y = popBumpers(bodies, y, rng);
   y = spiralMaze(bodies, y, rng);
   y = trapdoors(bodies, movers, y, rng);
-  y = seesaw(bodies, constraints, y, rng);
+  y = seesaw(bodies, movers, y, rng);
   y = dotsOnField(bodies, y, rng, 3);
   y = pendulums(bodies, movers, y, rng, 3);
   y = embudo(bodies, y, rng);
@@ -441,5 +444,5 @@ export function buildCourse(rng) {
     clouds.push({ x: rng.range(60, W - 60), y: cy, s: rng.range(0.6, 1.2) });
   }
 
-  return { bodies, spinners: spinnerList, movers, constraints, finishY, courseLength, clouds };
+  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds };
 }
