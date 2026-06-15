@@ -21,7 +21,7 @@ check('shrink to 3 keeps edits', s.count === 3 && s.toConfigs()[0].label === 'WE
 s.setCount(8);
 check('grow to 8', s.toConfigs().length === 8);
 
-check('clamps to 8 max', (s.setCount(20), s.count === 8));
+check('clamps to 30 max', (s.setCount(99), s.count === 30));
 check('clamps to 2 min', (s.setCount(1), s.count === 2));
 
 // End-to-end: configs actually drive ball count in a real race

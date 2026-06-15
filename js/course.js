@@ -327,6 +327,19 @@ function turbine(bodies, movers, y, rng) {
 
 // Pop-bumper cluster: pinball-style ACTIVE bumpers (very high restitution) that
 // fling balls. Adds chaos and keeps energy up without speeding the descent.
+// Choke point: two big smooth bulges from the walls narrowing the lane to a wide
+// neck (~330px, well above bridging width), then opening back up. Big radius =
+// gentle curve, so the field bunches as it funnels through but nothing wedges.
+// Placed before chaotic sections so the re-sorted pack can swap the lead.
+function chokePoint(bodies, y, rng) {
+  const R = 360, neck = 330, cy = y + R - 40;
+  const xL = (W - neck) / 2 - R;
+  const xR = (W + neck) / 2 + R;
+  bodies.push(peg(xL, cy, R, { restitution: 0.4, friction: 0.004 }));
+  bodies.push(peg(xR, cy, R, { restitution: 0.4, friction: 0.004 }));
+  return y + 2 * R - 40;
+}
+
 function popBumpers(bodies, y, rng) {
   const spots = [[330, 150], [540, 280], [750, 150], [430, 430], [650, 430]];
   for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 1.45 }));
@@ -543,18 +556,21 @@ export function buildCourse(rng) {
 
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 4);
-  y = turbine(bodies, movers, y, rng);
+  y = chokePoint(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
   y = bigDots(bodies, y, rng, 3);
   y = pendulums(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = turbine(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 3);
   y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
   y = bigDots(bodies, y, rng, 3);
   y = seesaw(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 4);
   y = sliders(bodies, movers, y, rng, 3);
-  y = archRamps(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 4);
-  y = popBumpers(bodies, y, rng);
   y = bigDots(bodies, y, rng, 4);
 
   const finishY = y + 160;

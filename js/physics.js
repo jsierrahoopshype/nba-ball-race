@@ -76,17 +76,9 @@ export function createRace(seed, ballConfigs) {
       // Progress tracking (for camera + standings ordering)
       if (ball.position.y > p.bestY) p.bestY = ball.position.y;
 
-      // Thriller finish: in the final stretch, trailing balls get a gentle extra
-      // pull scaled by how far behind the leader they are, so the pack bunches and
-      // the lead can change in the last second. Subtle enough to look natural.
-      if (ball.position.y > course.finishY * CONFIG.SURGE_ZONE) {
-        const leadY = Math.max(...balls.map(bb => bb.position.y));
-        const behind = leadY - ball.position.y;
-        if (behind > 120) {
-          Matter.Body.applyForce(ball, ball.position,
-            { x: 0, y: CONFIG.SURGE_FORCE * ball.mass * Math.min(1, behind / 1400) });
-        }
-      }
+      // (No catch-up surge or rubber-band: laggards are never sped up. Balance
+      // comes from the course itself, choke points that bunch the field, not
+      // from invisible forces.)
 
       // Anti-settle: while nearly stationary, nudge with a downward-biased seeded
       // impulse that RAMPS UP the longer it stays slow, so a ball that lands in a

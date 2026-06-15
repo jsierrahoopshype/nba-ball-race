@@ -11,7 +11,7 @@ export function createSetup(initialCount = 2) {
   let balls = [];
 
   function setCount(n) {
-    n = Math.max(2, Math.min(8, n | 0));
+    n = Math.max(2, Math.min(30, n | 0));
     const prev = balls;
     balls = [];
     for (let i = 0; i < n; i++) {
