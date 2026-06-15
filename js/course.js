@@ -74,6 +74,22 @@ function scatterDots(bodies, y, h, rng, skip) {
   }
 }
 
+// Wall ramps: flush at the wall (no gap behind), sloping down-and-inward to a
+// free tip, so a ball riding the margin slides off into open space toward center
+// instead of free-falling or wedging. Alternating sides down the block. Used in
+// OPEN blocks whose central feature is kept clear of the margin.
+function rampLine(bodies, yTop, yBot, rng) {
+  const len = 160, tilt = 0.34, sp = 330;
+  let i = Math.floor(yTop / sp); // phase by absolute y so adjacent blocks alternate
+  for (let yy = yTop + 40; yy < yBot - 20; yy += sp, i++) {
+    const left = i % 2 === 0;
+    const cxo = Math.cos(tilt) * len / 2, cyo = Math.sin(tilt) * len / 2;
+    const x = left ? cxo : W - cxo;
+    bodies.push(Matter.Bodies.rectangle(x, yy + cyo, len, 26,
+      { isStatic: true, angle: left ? tilt : -tilt, label: 'wall', restitution: 0.35, friction: 0.004 }));
+  }
+}
+
 // ---- Static filler blocks ----------------------------------------------
 
 // Reference-style BLOB CHANNEL: a full-width mass of big overlapping circles with
@@ -116,19 +132,19 @@ function archRamps(bodies, y, rng, count = 2) {
   const h = 620;
   const domes = [];
   for (let i = 0; i < count; i++) {
-    const cx = rng.range(330, 750);
+    const radius = rng.range(200, 250);
+    const cx = rng.range(210 + radius, W - 210 - radius); // keep dome clear of the margin
     const cy = y + 260 + i * 280;
-    const radius = rng.range(210, 280);
     domes.push({ cx, cy, radius });
     const segs = Math.round(radius / 11);
     for (let k = 0; k <= segs; k++) {
-      const a = Math.PI + (k / segs) * Math.PI; // top semicircle, left to right
+      const a = Math.PI + (k / segs) * Math.PI;
       const px = cx + Math.cos(a) * radius, py = cy + Math.sin(a) * radius;
       const segLen = (Math.PI * radius / segs) * 1.25;
       bodies.push(rect(px, py, segLen, 24, { angle: a + Math.PI / 2, restitution: 0.42 }));
     }
   }
-  scatterDots(bodies, y, h, rng, (x, yy) => domes.some(d => Math.hypot(x - d.cx, yy - d.cy) < d.radius + 105));
+  rampLine(bodies, y, y + h, rng);
   return y + h + 100;
 }
 
@@ -180,13 +196,14 @@ function ringsInField(bodies, y, rng, count = 2) {
   const r = 200, sy = 215;
   const rings = [];
   for (let i = 0; i < count; i++) {
-    const cx = rng.range(360, 720);
+    const cx = rng.range(460, W - 460); // ring edges clear the ramp tips by >100px
     const cy = y + r + 40 + i * sy;
     rings.push({ cx, cy });
     ringSegments(bodies, cx, cy, r, rng.range(1.25, 1.9), 0.46);
   }
   const h = r + (count - 1) * sy + r + 80;
-  gridPegs(bodies, y, h, rng, 32, (px, py) => rings.some(rg => Math.hypot(px - rg.cx, py - rg.cy) < r + 140));
+  gridPegs(bodies, y, h, rng, 32, (px, py) => px < 215 || px > W - 215 || rings.some(rg => Math.hypot(px - rg.cx, py - rg.cy) < r + 140));
+  rampLine(bodies, y, y + h, rng);
   return y + h + 120;
 }
 
@@ -284,16 +301,17 @@ function turbine(bodies, movers, y, rng) {
   movers.push({ body: rotor, update(step) { Matter.Body.setAngle(rotor, step * spd); } });
   bodies.push(peg(cx, cy, 18));
   // pegs around it (clear of the swept circle)
-  gridPegs(bodies, y, 640, rng, 30, (px, py) => Math.hypot(px - cx, py - cy) < arm / 2 + 70);
+  gridPegs(bodies, y, 640, rng, 30, (px, py) => px < 215 || px > W - 215 || Math.hypot(px - cx, py - cy) < arm / 2 + 70);
+  rampLine(bodies, y, y + 640, rng);
   return y + 640 + 120;
 }
 
 // Pop-bumper cluster: pinball-style ACTIVE bumpers (very high restitution) that
 // fling balls. Adds chaos and keeps energy up without speeding the descent.
 function popBumpers(bodies, y, rng) {
-  const spots = [[270, 150], [540, 280], [810, 150], [400, 430], [680, 430]];
+  const spots = [[330, 150], [540, 280], [750, 150], [430, 430], [650, 430]];
   for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 1.45 }));
-  scatterDots(bodies, y, 600, rng, (x, yy) => spots.some(([sx, dy]) => Math.hypot(x - sx, yy - (y + dy)) < 150));
+  rampLine(bodies, y, y + 600, rng);
   return y + 600;
 }
 
@@ -369,7 +387,7 @@ function conveyor(bodies, y, rng) {
 // clean, deterministic see-saw motion that still bats balls left/right.
 function seesaw(bodies, movers, y, rng) {
   const cx = W / 2, cy = y + 220;
-  const bar = Matter.Bodies.rectangle(cx, cy, 620, 34, {
+  const bar = Matter.Bodies.rectangle(cx, cy, 520, 34, {
     isStatic: true, label: 'obstacle', restitution: 0.35, friction: 0.04,
   });
   bodies.push(bar);
@@ -381,6 +399,7 @@ function seesaw(bodies, movers, y, rng) {
     body: bar,
     update(step) { Matter.Body.setAngle(bar, amp * Math.sin(step * spd + phase)); },
   });
+  rampLine(bodies, y, y + 440, rng);
   return y + 440;
 }
 
@@ -505,22 +524,16 @@ export function buildCourse(rng) {
 
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 4);
-  y = pendulums(bodies, movers, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
   y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 3);
-  y = sliders(bodies, movers, y, rng, 3);
+  y = pendulums(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
   y = ringsInField(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 3);
   y = seesaw(bodies, movers, y, rng);
-  y = archRamps(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 4);
-  y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 4);
   y = sliders(bodies, movers, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
-  y = ringsInField(bodies, y, rng, 2);
+  y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 4);
   y = popBumpers(bodies, y, rng);
   y = bigDots(bodies, y, rng, 4);
