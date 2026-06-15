@@ -186,3 +186,12 @@ body {
 .btn.small.ghost { color: var(--dim); padding: 6px 9px; }
 
 .template-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.analysts-block { margin-top: 12px; border-top: 1px solid #2a2a33; padding-top: 10px; }
+.analysts-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.char-lib { background: #1b1b22; color: #e8e8ec; border: 1px solid #33333d; border-radius: 6px; padding: 4px 6px; }
+.analyst-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.analyst-row .a-chip { width: 22px; text-align: center; color: #4ad17a; font-weight: 800; }
+.analyst-row .a-name { width: 90px; }
+.analyst-row .a-pick { width: 150px; }
+.analyst-row .a-speech { flex: 1 1 140px; }

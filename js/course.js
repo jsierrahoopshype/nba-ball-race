@@ -706,5 +706,27 @@ export function buildCourse(rng, opts = {}) {
     }
   }
 
-  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds, eliminators, mode };
+  // Analyst obstacles: big face-bodies the balls physically bounce off, spread
+  // down the lane (off the walls so they don't wedge). Passed in via opts;
+  // drawn with a headshot + speech bubble by draw.js. Cosmetic identity only,
+  // the physics is just a big peg.
+  const analysts = [];
+  const aList = opts.analysts || [];
+  if (aList.length) {
+    const top = 1300, bot = finishY - 900, span = Math.max(1, bot - top);
+    aList.forEach((a, i) => {
+      const ay = top + span * (i + 0.5) / aList.length + rng.range(-160, 160);
+      const ax = rng.range(360, W - 360);
+      const body = peg(ax, ay, 94, { restitution: 0.55, friction: 0.004 });
+      body.label = 'analyst';
+      body.plugin.analyst = {
+        name: a.name || '', image: a.image || null,
+        speech: a.speech || '', bubbleSide: ax < W / 2 ? 'R' : 'L',
+      };
+      bodies.push(body);
+      analysts.push(body);
+    });
+  }
+
+  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds, eliminators, analysts, mode };
 }

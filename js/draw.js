@@ -55,7 +55,7 @@ export function drawWorld(ctx, race, cam) {
   ctx.translate(-cam.x, -cam.y);
 
   for (const body of race.course.bodies) {
-    if (body.label === 'wall') continue;
+    if (body.label === 'wall' || body.label === 'analyst') continue;
     ctx.fillStyle = body.label === 'eliminator' ? '#e23b3b' : OBSTACLE;
     const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
     for (const part of parts) {
@@ -75,6 +75,14 @@ export function drawWorld(ctx, race, cam) {
   }
 
   drawFinish(ctx, race.course.finishY);
+
+  // Analyst face obstacles + speech bubbles (world space, above obstacles)
+  for (const body of (race.course.analysts || [])) {
+    const a = body.plugin.analyst;
+    if (body.bounds.max.y < cam.y - 200 || body.bounds.min.y > cam.y + cam.visH + 200) continue;
+    drawAnalyst(ctx, body, a);
+  }
+
   for (const ball of race.balls) { if (!ball.plugin.ball.eliminated) drawBall(ctx, ball); }
 
   ctx.restore();
@@ -124,6 +132,61 @@ function drawBackground(ctx, bg, race, cam, W, H) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, SKY_TOP); g.addColorStop(1, SKY_BOTTOM);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+// Analyst obstacle: headshot in a ringed disk, with a speech bubble alongside.
+function drawAnalyst(ctx, body, a) {
+  const x = body.position.x, y = body.position.y, r = body.circleRadius;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#1b1d27'; ctx.fill();
+  ctx.restore();
+  if (a.image) {
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+    drawFace(ctx, a.image, x - r, y - r, r * 2); ctx.restore();
+  } else {
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 ${Math.round(r * 0.5)}px system-ui, sans-serif`;
+    ctx.fillText((a.name || '?').slice(0, 3).toUpperCase(), x, y);
+  }
+  ctx.lineWidth = 6; ctx.strokeStyle = '#ffd54a';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+
+  if (a.speech && a.speech.trim()) {
+    const right = a.bubbleSide === 'R';
+    const bw = 300, pad = 18, lh = 34;
+    ctx.font = '700 28px system-ui, sans-serif';
+    const words = a.speech.trim().split(/\s+/); const lines = []; let line = '';
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w;
+      if (ctx.measureText(t).width > bw - pad * 2 && line) { lines.push(line); line = w; }
+      else line = t;
+    }
+    if (line) lines.push(line);
+    const bh = lines.length * lh + pad * 2;
+    const bx = right ? x + r + 24 : x - r - 24 - bw;
+    const by = y - bh / 2;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#15151a'; ctx.lineWidth = 4;
+    roundRectPath(ctx, bx, by, bw, bh, 18); ctx.fill(); ctx.stroke();
+    // tail toward the face
+    ctx.beginPath();
+    const tx = right ? bx : bx + bw;
+    ctx.moveTo(tx, y - 14); ctx.lineTo(tx + (right ? -22 : 22), y); ctx.lineTo(tx, y + 14);
+    ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.fillStyle = '#15151a'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    lines.forEach((ln, i) => ctx.fillText(ln, bx + pad, by + pad + i * lh));
+  }
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function drawCloud(ctx, x, y, s) {

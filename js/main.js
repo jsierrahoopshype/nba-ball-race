@@ -183,7 +183,7 @@ function startRace(seed, record = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
-  race = createRace(seed, setup.toConfigs(), { mode: raceMode, preset: racePreset });
+  race = createRace(seed, setup.toConfigs(), { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace() });
   race.bg = currentBg();
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
@@ -283,6 +283,7 @@ function buildTemplate() {
     showIntro: !!(showIntroChk && showIntroChk.checked),
     course: coursePresetSelect ? coursePresetSelect.value : 'classic',
     bg: bgTypeSelect ? bgTypeSelect.value : 'sky',
+    analysts: analysts.map(a => ({ name: a.name, source: a.source || null, speech: a.speech || '' })),
     balls: setup.balls.map(b => ({
       label: b.label, name: b.name || '', color: b.color,
       source: b.source || null, imageFit: b.imageFit || 'cover',
@@ -338,6 +339,9 @@ function applyTemplate(t) {
   if (showIntroChk) showIntroChk.checked = t.showIntro !== false;
   if (coursePresetSelect && t.course) coursePresetSelect.value = t.course;
   if (bgTypeSelect && t.bg) { bgTypeSelect.value = t.bg; bgImgBtn.style.display = t.bg === 'upload' ? '' : 'none'; }
+  analysts = (t.analysts || []).map(a => ({ name: a.name || '', source: a.source || null, speech: a.speech || '', image: null }));
+  renderAnalystRows();
+  analysts.forEach(async (a, idx) => { if (a.source) { const img = await resolveImageFromSource(a.source); if (img) { a.image = img; markAnalystChip(idx); } } });
   renderRows();
   status(`template loaded (${n} balls)`);
 }
@@ -346,3 +350,97 @@ function refreshChip(i) {
   const row = ballRowsEl.children[i];
   if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
 }
+
+// ---- Analysts + character library ----------------------------------------
+// Analysts are face-obstacles with speech bubbles. The library persists named
+// characters (face reference + default line) in localStorage so you set up a
+// personality once and drop it into any race.
+const LIB_KEY = 'ballrace-characters';
+let analysts = []; // in-session: { name, source, speech, image }
+const analystRowsEl = document.getElementById('analyst-rows');
+const charLibrarySelect = document.getElementById('char-library');
+
+function loadLibrary() {
+  try { return JSON.parse(localStorage.getItem(LIB_KEY)) || []; } catch { return []; }
+}
+function saveLibrary(list) {
+  try { localStorage.setItem(LIB_KEY, JSON.stringify(list)); } catch {}
+}
+function refreshLibraryDropdown() {
+  const lib = loadLibrary();
+  charLibrarySelect.innerHTML = '<option value="">saved characters…</option>';
+  lib.forEach((c, i) => {
+    const o = document.createElement('option'); o.value = String(i);
+    o.textContent = c.name || `character ${i + 1}`; charLibrarySelect.appendChild(o);
+  });
+}
+
+async function resolveImageFromSource(source) {
+  if (!source) return null;
+  if (source.startsWith('player:')) { const p = playerById.get(source.slice(7)); return p ? loadImage(HEADSHOT_URL(p[3])) : null; }
+  if (source.startsWith('team:')) { const t = teamByAbbr.get(source.slice(5)); return t ? loadImage(TEAM_LOGO_URL(t[0])) : null; }
+  return null;
+}
+
+async function resolveAnalystPick(idx, raw) {
+  const key = raw.trim().toLowerCase();
+  const player = playerByName.get(key), team = teamByLabel.get(key);
+  if (player) {
+    const img = await loadImage(HEADSHOT_URL(player[3]));
+    if (img) { analysts[idx].image = img; analysts[idx].source = `player:${player[2]}`; if (!analysts[idx].name) analysts[idx].name = player[0]; markAnalystChip(idx); }
+  } else if (team) {
+    const img = await loadImage(TEAM_LOGO_URL(team[0]));
+    if (img) { analysts[idx].image = img; analysts[idx].source = `team:${team[0]}`; markAnalystChip(idx); }
+  }
+}
+
+function markAnalystChip(idx) {
+  const row = analystRowsEl.children[idx];
+  if (row) { const chip = row.querySelector('.a-chip'); if (chip) chip.textContent = analysts[idx].image ? '✓' : ''; }
+}
+
+function renderAnalystRows() {
+  analystRowsEl.innerHTML = '';
+  analysts.forEach((a, i) => {
+    const row = document.createElement('div'); row.className = 'analyst-row';
+    const chip = document.createElement('span'); chip.className = 'a-chip'; chip.textContent = a.image ? '✓' : '';
+    const name = document.createElement('input'); name.className = 'a-name'; name.placeholder = 'name'; name.value = a.name || '';
+    name.addEventListener('input', () => { a.name = name.value; });
+    const pick = document.createElement('input'); pick.className = 'a-pick'; pick.placeholder = 'face: player/team'; pick.setAttribute('list', 'pick-list');
+    pick.addEventListener('change', () => resolveAnalystPick(i, pick.value));
+    const speech = document.createElement('input'); speech.className = 'a-speech'; speech.placeholder = 'speech bubble'; speech.maxLength = 40; speech.value = a.speech || '';
+    speech.addEventListener('input', () => { a.speech = speech.value; });
+    const star = document.createElement('button'); star.className = 'btn small'; star.textContent = '★'; star.title = 'save to library';
+    star.addEventListener('click', () => {
+      if (!a.name && !a.source) { status('name the analyst first'); return; }
+      const lib = loadLibrary(); lib.push({ name: a.name || '', source: a.source || null, speech: a.speech || '' });
+      saveLibrary(lib); refreshLibraryDropdown(); status(`saved ${a.name || 'character'} to library`);
+    });
+    const del = document.createElement('button'); del.className = 'btn small'; del.textContent = '×'; del.title = 'remove';
+    del.addEventListener('click', () => { analysts.splice(i, 1); renderAnalystRows(); });
+    row.append(chip, name, pick, speech, star, del);
+    analystRowsEl.appendChild(row);
+  });
+}
+
+document.getElementById('btn-add-analyst').addEventListener('click', () => {
+  if (analysts.length >= 8) { status('8 analysts max'); return; }
+  analysts.push({ name: '', source: null, speech: '', image: null });
+  renderAnalystRows();
+});
+
+charLibrarySelect.addEventListener('change', async () => {
+  const idx = charLibrarySelect.value; if (idx === '') return;
+  const c = loadLibrary()[+idx]; charLibrarySelect.value = '';
+  if (!c) return;
+  const a = { name: c.name || '', source: c.source || null, speech: c.speech || '', image: null };
+  analysts.push(a); renderAnalystRows();
+  if (a.source) { const img = await resolveImageFromSource(a.source); if (img) { a.image = img; markAnalystChip(analysts.indexOf(a)); } }
+});
+
+// Resolved analyst list for the race (only those with a face or a name)
+function buildAnalystsForRace() {
+  return analysts.filter(a => a.image || a.name).map(a => ({ name: a.name, image: a.image, speech: a.speech }));
+}
+
+refreshLibraryDropdown();

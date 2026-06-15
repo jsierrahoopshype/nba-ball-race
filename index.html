@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=18">
+<link rel="stylesheet" href="css/editor.css?v=19">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.16</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.17</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -69,6 +69,15 @@
           <input type="file" id="tpl-file" accept="application/json,.json" class="file-hidden" />
           <span class="hint">saves balls, mode, hook, course &amp; background as JSON (uploaded images aren't saved)</span>
         </div>
+        <div class="analysts-block">
+          <div class="analysts-head">
+            <strong>Analysts</strong>
+            <button id="btn-add-analyst" class="btn small">+ Analyst</button>
+            <select id="char-library" class="char-lib"><option value="">saved characters…</option></select>
+            <span class="hint">faces become obstacles with speech bubbles balls bounce off</span>
+          </div>
+          <div id="analyst-rows"></div>
+        </div>
       </div>
     </details>
 
@@ -79,6 +88,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=18"></script>
+  <script type="module" src="js/main.js?v=19"></script>
 </body>
 </html>
