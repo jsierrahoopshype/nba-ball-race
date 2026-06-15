@@ -28,6 +28,27 @@ const countSelect = document.getElementById('ball-count');
 const ballRowsEl = document.getElementById('ball-rows');
 const winModeSelect = document.getElementById('win-mode');
 const hookInput = document.getElementById('hook-text');
+const showIntroChk = document.getElementById('show-intro');
+const bgTypeSelect = document.getElementById('bg-type');
+const bgFile = document.getElementById('bg-file');
+const bgImgBtn = document.getElementById('bg-img-btn');
+
+let bgImage = null; // uploaded background image, if any
+bgTypeSelect.addEventListener('change', () => {
+  bgImgBtn.style.display = bgTypeSelect.value === 'upload' ? '' : 'none';
+});
+bgFile.addEventListener('change', () => {
+  const f = bgFile.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { bgImage = img; bgTypeSelect.value = 'upload'; bgImgBtn.style.display = ''; };
+  img.src = URL.createObjectURL(f);
+});
+
+function currentBg() {
+  const type = bgTypeSelect.value;
+  if (type === 'upload') return { type, image: bgImage };
+  return { type };
+}
 
 const recorder = createRecorder(canvas);
 if (!recorder.supported) { btnRec.disabled = true; btnRec.title = 'Recording not supported in this browser'; }
@@ -161,10 +182,12 @@ function startRace(seed, record = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   race = createRace(seed, setup.toConfigs(), { mode: raceMode });
+  race.bg = currentBg();
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
   camera.update(lead.position.x, lead.position.y, true);
-  mode = 'intro'; introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
+  mode = (showIntroChk && !showIntroChk.checked) ? 'countdown' : 'intro';
+  introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
   downloadFired = false; recordingThisRace = record;
   seedInput.value = String(seed);
   btnReplay.disabled = false;

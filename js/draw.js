@@ -33,23 +33,21 @@ export function drawBallImage(ctx, p, x, y, size) {
 
 export function drawWorld(ctx, race, cam) {
   const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H, Z = CONFIG.ZOOM;
+  const bg = race.bg || { type: 'sky' };
 
-  // Sky (screen space)
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, SKY_TOP);
-  g.addColorStop(1, SKY_BOTTOM);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
+  drawBackground(ctx, bg, race, cam, W, H);
 
-  // Clouds (parallax)
-  ctx.save();
-  ctx.scale(Z, Z);
-  ctx.translate(-cam.x * 0.8, -cam.y * 0.55);
-  for (const c of race.course.clouds) {
-    if (c.y < cam.y * 0.55 - 200 || c.y > cam.y * 0.55 + cam.visH + 200) continue;
-    drawCloud(ctx, c.x, c.y, c.s);
+  // Clouds (parallax) only over sky-like backgrounds
+  if (bg.type === 'sky' || bg.type === 'gradient') {
+    ctx.save();
+    ctx.scale(Z, Z);
+    ctx.translate(-cam.x * 0.8, -cam.y * 0.55);
+    for (const c of race.course.clouds) {
+      if (c.y < cam.y * 0.55 - 200 || c.y > cam.y * 0.55 + cam.visH + 200) continue;
+      drawCloud(ctx, c.x, c.y, c.s);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   // World layer
   ctx.save();
@@ -80,6 +78,52 @@ export function drawWorld(ctx, race, cam) {
   for (const ball of race.balls) { if (!ball.plugin.ball.eliminated) drawBall(ctx, ball); }
 
   ctx.restore();
+}
+
+// Selectable backgrounds. Cosmetic only (never affects physics). Stored on
+// race.bg so replays and the future HQ render reproduce the same look.
+function drawBackground(ctx, bg, race, cam, W, H) {
+  if (bg.type === 'upload' && bg.image) {
+    // cover the full 9:16 frame, center-cropped to fill without distortion
+    const img = bg.image, ir = img.width / img.height, fr = W / H;
+    let sw, sh, sx, sy;
+    if (ir > fr) { sh = img.height; sw = sh * fr; sx = (img.width - sw) / 2; sy = 0; }
+    else { sw = img.width; sh = sw / fr; sx = 0; sy = (img.height - sh) / 2; }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+    return;
+  }
+  if (bg.type === 'court') {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#caa15e'); g.addColorStop(0.5, '#b9792f'); g.addColorStop(1, '#9c6328');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // faint wood plank lines
+    ctx.strokeStyle = 'rgba(80,45,15,0.18)'; ctx.lineWidth = 3;
+    for (let x = 0; x < W; x += 90) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    return;
+  }
+  if (bg.type === 'arena') {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#1b1d27'); g.addColorStop(1, '#0c0d13');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const r = ctx.createRadialGradient(W / 2, H * 0.32, 80, W / 2, H * 0.32, H * 0.7);
+    r.addColorStop(0, 'rgba(120,150,200,0.18)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = r; ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  if (bg.type === 'gradient') {
+    // team-color gradient: blend the first two balls' colors (matchup colors)
+    const cols = race.balls.map(b => b.plugin.ball.color);
+    const a = bg.colorA || cols[0] || SKY_TOP;
+    const c = bg.colorB || cols[1] || cols[0] || SKY_BOTTOM;
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, a); g.addColorStop(1, c);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  // sky (default)
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, SKY_TOP); g.addColorStop(1, SKY_BOTTOM);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
 
 function drawCloud(ctx, x, y, s) {

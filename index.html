@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=16">
+<link rel="stylesheet" href="css/editor.css?v=17">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.14</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.15</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -39,6 +39,20 @@
         <label class="count-field" style="flex:1 1 240px">hook
           <input id="hook-text" type="text" maxlength="60" placeholder="Who wins the East?" style="flex:1" />
         </label>
+        <label class="count-field">bg
+          <select id="bg-type">
+            <option value="sky">Sky</option>
+            <option value="court">Court</option>
+            <option value="arena">Arena</option>
+            <option value="gradient">Team gradient</option>
+            <option value="upload">Upload…</option>
+          </select>
+          <input type="file" id="bg-file" accept="image/*" class="file-hidden" />
+          <label for="bg-file" class="btn small" id="bg-img-btn" style="display:none">IMG</label>
+        </label>
+        <label class="count-field" title="Show the matchup card before the countdown">
+          <input id="show-intro" type="checkbox" checked /> intro card
+        </label>
         <div id="ball-rows"></div>
       </div>
     </details>
@@ -50,6 +64,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=16"></script>
+  <script type="module" src="js/main.js?v=17"></script>
 </body>
 </html>
