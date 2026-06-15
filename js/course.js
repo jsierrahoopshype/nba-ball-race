@@ -86,8 +86,21 @@ function rampLine(bodies, yTop, yBot, rng) {
     const cxo = Math.cos(tilt) * len / 2, cyo = Math.sin(tilt) * len / 2;
     const x = left ? cxo : W - cxo;
     bodies.push(Matter.Bodies.rectangle(x, yy + cyo, len, 26,
-      { isStatic: true, angle: left ? tilt : -tilt, label: 'wall', restitution: 0.35, friction: 0.004 }));
+      { isStatic: true, angle: left ? tilt : -tilt, label: 'obstacle', restitution: 0.35, friction: 0.004 }));
   }
+}
+
+// Half-disk flush on a side wall, flat edge ON the wall (no gap behind it to
+// wedge in), curved face bulging inward. Labeled 'obstacle' so it renders.
+function wallSemi(side, cy, R) {
+  const wallX = side === 'L' ? 0 : W, sign = side === 'L' ? 1 : -1, steps = 10, verts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = -Math.PI / 2 + (i / steps) * Math.PI;
+    verts.push({ x: wallX + sign * R * Math.cos(t), y: cy + R * Math.sin(t) });
+  }
+  const cxoff = sign * (4 * R / (3 * Math.PI));
+  return Matter.Bodies.fromVertices(wallX + cxoff, cy, [verts],
+    { isStatic: true, label: 'obstacle', restitution: 0.45, friction: 0.004 });
 }
 
 // ---- Static filler blocks ----------------------------------------------
@@ -118,10 +131,16 @@ function blobChannel(bodies, y, rng, rows = 12) {
 function bigDots(bodies, y, rng, rows = 4) {
   const R = 72, sy = 210, sx = 268;
   for (let r = 0; r < rows; r++) {
+    const ry = y + 70 + r * sy;
     const off = (r % 2) ? sx / 2 : 0;
-    for (let x = 95 + off; x <= W - 95; x += sx) {
-      bodies.push(peg(x + rng.range(-10, 10), y + 70 + r * sy, R, { restitution: 0.5 }));
+    // interior dots only; the wall margin is covered by flush semicircles below
+    for (let x = 275 + off; x <= W - 275; x += sx) {
+      bodies.push(peg(x + rng.range(-10, 10), ry, R, { restitution: 0.5 }));
     }
+    // flush semicircles ON the wall: no crescent gap, so a ball can't wedge
+    // between wall and circle (replaces the edge dots, same density).
+    const L = wallSemi('L', ry, 96); if (L) bodies.push(L);
+    const Rr = wallSemi('R', ry, 96); if (Rr) bodies.push(Rr);
   }
   return y + rows * sy + 120;
 }
