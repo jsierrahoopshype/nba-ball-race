@@ -7,7 +7,7 @@ import { freshSeed } from './rng.js';
 import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
-import { drawLeaderboard, drawCountdown, drawWinner } from './hud.js';
+import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup } from './hud.js';
 import { createRecorder } from './recorder.js';
 import { createSetup } from './setup.js';
 import { loadImage } from './images.js';
@@ -26,6 +26,8 @@ const btnRec = document.getElementById('btn-rec');
 const statusEl = document.getElementById('status');
 const countSelect = document.getElementById('ball-count');
 const ballRowsEl = document.getElementById('ball-rows');
+const winModeSelect = document.getElementById('win-mode');
+const hookInput = document.getElementById('hook-text');
 
 const recorder = createRecorder(canvas);
 if (!recorder.supported) { btnRec.disabled = true; btnRec.title = 'Recording not supported in this browser'; }
@@ -149,16 +151,20 @@ function status(msg) { statusEl.textContent = msg; }
 // ---- Race state machine --------------------------------------------------
 
 let race = null, camera = null, mode = 'idle';
-let countdownT = 0, winnerT = 0, accumulator = 0, lastTime = null;
+let countdownT = 0, winnerT = 0, accumulator = 0, lastTime = null, introT = 0;
 let recordingThisRace = false, downloadFired = false;
+let raceHook = '', raceMode = 'finish';
 const COUNTDOWN_BEAT = 0.5;
+const INTRO_S = 1.4;
 
 function startRace(seed, record = false) {
-  race = createRace(seed, setup.toConfigs());
+  raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
+  raceHook = hookInput.value || '';
+  race = createRace(seed, setup.toConfigs(), { mode: raceMode });
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
   camera.update(lead.position.x, lead.position.y, true);
-  mode = 'countdown'; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
+  mode = 'intro'; introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
   downloadFired = false; recordingThisRace = record;
   seedInput.value = String(seed);
   btnReplay.disabled = false;
@@ -186,7 +192,12 @@ function loop(now) {
   let dt = (now - lastTime) / 1000; lastTime = now;
   if (dt > 0.25) dt = 0.25;
 
-  if (mode === 'countdown') {
+  if (mode === 'intro') {
+    introT += dt;
+    if (introT >= INTRO_S) mode = 'countdown';
+    drawMatchup(ctx, race.balls, raceHook, race.mode);
+    return;
+  } else if (mode === 'countdown') {
     countdownT += dt;
     if (countdownT >= COUNTDOWN_BEAT * 4) mode = 'racing';
   } else if (mode === 'racing') {
@@ -201,7 +212,7 @@ function loop(now) {
   }
 
   const order = race.standings();
-  const active = order.find(b => !b.plugin.ball.finished) || order[order.length - 1];
+  const active = order.find(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated) || order[0];
   camera.update(active.position.x, active.plugin.ball.bestY);
 
   drawWorld(ctx, race, camera);

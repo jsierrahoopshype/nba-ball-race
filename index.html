@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=15">
+<link rel="stylesheet" href="css/editor.css?v=16">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.13</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.14</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -30,6 +30,15 @@
           </select>
           <span class="hint">type a player or team in the picker to put a face/logo in the ball</span>
         </label>
+        <label class="count-field">mode
+          <select id="win-mode">
+            <option value="finish">First to finish</option>
+            <option value="survivor">Last ball standing</option>
+          </select>
+        </label>
+        <label class="count-field" style="flex:1 1 240px">hook
+          <input id="hook-text" type="text" maxlength="60" placeholder="Who wins the East?" style="flex:1" />
+        </label>
         <div id="ball-rows"></div>
       </div>
     </details>
@@ -41,6 +50,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=15"></script>
+  <script type="module" src="js/main.js?v=16"></script>
 </body>
 </html>

@@ -9,8 +9,9 @@ import { createRNG } from './rng.js';
 import { buildCourse } from './course.js';
 import { makeBalls } from './balls.js';
 
-export function createRace(seed, ballConfigs) {
+export function createRace(seed, ballConfigs, opts = {}) {
   const rng = createRNG(seed);
+  const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
 
   const engine = Matter.Engine.create({
     enableSleeping: false,
@@ -19,11 +20,13 @@ export function createRace(seed, ballConfigs) {
   engine.positionIterations = 8;
   engine.velocityIterations = 6;
 
-  const course = buildCourse(rng);
+  const course = buildCourse(rng, { mode });
   const balls = makeBalls(ballConfigs, rng);
   Matter.Composite.add(engine.world, [...course.bodies, ...balls]);
 
-  // Conveyor belts: shove balls sideways on contact (label-driven, deterministic).
+  const pendingRemoval = [];
+
+  // Conveyor belts + survivor-mode eliminators (label-driven, deterministic).
   Matter.Events.on(engine, 'collisionActive', (ev) => {
     for (const pair of ev.pairs) {
       const a = pair.bodyA, b = pair.bodyB;
@@ -32,25 +35,36 @@ export function createRace(seed, ballConfigs) {
       if (!ball) continue;
       const push = other.plugin && other.plugin.conveyor;
       if (push) Matter.Body.setVelocity(ball, { x: push, y: ball.velocity.y });
+      if (mode === 'survivor' && other.label === 'eliminator') eliminate(ball);
     }
   });
 
   const race = {
-    seed, engine, balls, course,
+    seed, engine, balls, course, mode,
     step: 0,
-    winner: null,         // first ball to cross the line
+    winner: null,         // first ball to cross the line (or lone survivor)
     finishOrder: [],      // balls in the order they finished (final standings)
-    finished: false,      // true once every ball has finished
+    eliminatedOrder: [],  // survivor mode: balls in the order they were eliminated
+    finished: false,
   };
 
   function placeFinish(ball) {
     const p = ball.plugin.ball;
-    if (p.finished) return;
+    if (p.finished || p.eliminated) return;
     p.finished = true;
     p.finishStep = race.step;
     p.place = race.finishOrder.length + 1;
     race.finishOrder.push(ball);
     if (!race.winner) race.winner = ball;
+  }
+
+  function eliminate(ball) {
+    const p = ball.plugin.ball;
+    if (p.finished || p.eliminated) return;
+    p.eliminated = true;
+    p.eliminatedStep = race.step;
+    race.eliminatedOrder.push(ball);
+    pendingRemoval.push(ball); // vanish from the world after the step
   }
 
   race.tick = function tick() {
@@ -63,7 +77,7 @@ export function createRace(seed, ballConfigs) {
 
     for (const ball of balls) {
       const p = ball.plugin.ball;
-      if (p.finished) continue;
+      if (p.finished || p.eliminated) continue;
 
       // Velocity cap: stops fast balls tunneling through thin obstacles
       const v = ball.velocity;
@@ -120,11 +134,20 @@ export function createRace(seed, ballConfigs) {
       if (ball.position.y >= course.finishY) placeFinish(ball);
     }
 
-    // Tail timeout: once the winner is in, don't wait forever on stragglers.
+    // Remove eliminated balls from the world so they vanish (after the loop).
+    while (pendingRemoval.length) Matter.Composite.remove(engine.world, pendingRemoval.pop());
+
+    // Survivor mode: if only one ball is still alive (others eliminated), it wins.
+    if (mode === 'survivor' && race.eliminatedOrder.length) {
+      const alive = balls.filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated);
+      if (alive.length === 1) placeFinish(alive[0]);
+    }
+
+    // Tail timeout: once a winner is in, don't wait forever on stragglers.
     if (race.winner) {
       const tail = race.step - race.winner.plugin.ball.finishStep;
       if (tail > CONFIG.TAIL_S * 60) {
-        [...balls].filter(b => !b.plugin.ball.finished)
+        [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
           .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
           .forEach(placeFinish);
       }
@@ -132,23 +155,39 @@ export function createRace(seed, ballConfigs) {
 
     // Absolute safety cap
     if (race.step > CONFIG.HARD_TIMEOUT_S * 60) {
-      [...balls].filter(b => !b.plugin.ball.finished)
+      [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
         .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
         .forEach(placeFinish);
     }
 
-    if (balls.every(b => b.plugin.ball.finished)) race.finished = true;
+    // Race ends when every ball is terminal (finished or eliminated).
+    if (balls.every(b => b.plugin.ball.finished || b.plugin.ball.eliminated)) {
+      // Rank eliminated balls below finishers: last eliminated places best.
+      let place = race.finishOrder.length;
+      for (let i = race.eliminatedOrder.length - 1; i >= 0; i--) {
+        const p = race.eliminatedOrder[i].plugin.ball;
+        if (p.place == null) p.place = ++place;
+      }
+      if (!race.winner && race.eliminatedOrder.length) {
+        race.winner = race.eliminatedOrder[race.eliminatedOrder.length - 1];
+      }
+      race.finished = true;
+    }
 
     Matter.Engine.update(engine, CONFIG.STEP_MS);
   };
 
-  // Live standings: finished balls by place, then the rest by progress.
+  // Live standings: finished by place, then alive by progress, then eliminated.
   race.standings = function standings() {
     return [...balls].sort((a, b) => {
       const pa = a.plugin.ball, pb = b.plugin.ball;
-      if (pa.finished && pb.finished) return pa.place - pb.place;
-      if (pa.finished) return -1;
-      if (pb.finished) return 1;
+      const ta = pa.finished, tb = pb.finished;
+      if (ta && tb) return pa.place - pb.place;
+      if (ta) return -1;
+      if (tb) return 1;
+      if (pa.eliminated && pb.eliminated) return pb.eliminatedStep - pa.eliminatedStep;
+      if (pa.eliminated) return 1;
+      if (pb.eliminated) return -1;
       return pb.bestY - pa.bestY;
     });
   };

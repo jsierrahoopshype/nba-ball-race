@@ -61,6 +61,76 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // Countdown numbers + GO. t goes 3 -> 0; each unit is one beat.
+// Intro matchup card: hook text up top, every ball's face laid out below.
+// Shown before the countdown; doubles as the recording's scroll-stopper frame.
+export function drawMatchup(ctx, balls, hook, mode) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#7dd0f7'); g.addColorStop(1, '#5cb8ec');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  // Hook text (wrapped), big and bold near the top
+  const hookText = (hook && hook.trim()) || 'WHO WINS?';
+  ctx.fillStyle = '#15151a';
+  ctx.font = '900 96px system-ui, sans-serif';
+  const words = hookText.toUpperCase().split(/\s+/);
+  const lines = []; let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > W - 120 && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  lines.forEach((ln, i) => ctx.fillText(ln, W / 2, H * 0.16 + i * 104));
+
+  // Faces grid, centered in the middle band
+  const n = balls.length;
+  const cols = n <= 2 ? n : (n <= 4 ? 2 : (n <= 9 ? 3 : (n <= 16 ? 4 : 5)));
+  const rows = Math.ceil(n / cols);
+  const r = Math.max(60, Math.min(190, 760 / cols - 40));
+  const gapX = (W) / cols, gapY = Math.min(r * 2.7, 1500 / rows);
+  const top = H * 0.5 - (rows - 1) * gapY / 2;
+
+  balls.forEach((ball, i) => {
+    const p = ball.plugin.ball;
+    const cx = (i % cols + 0.5) * gapX;
+    const cy = top + Math.floor(i / cols) * gapY;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+    ctx.restore();
+    if (p.image) {
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+      drawBallImage(ctx, p, cx - r, cy - r, r * 2); ctx.restore();
+    } else {
+      ctx.fillStyle = p.textColor;
+      ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
+      ctx.fillText(p.label, cx, cy);
+    }
+    ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    if (n <= 8) {
+      ctx.fillStyle = '#15151a';
+      ctx.font = '800 38px system-ui, sans-serif';
+      ctx.fillText((p.name || p.label).toUpperCase(), cx, cy + r + 34);
+    }
+    // "VS" between two duelists
+    if (n === 2 && i === 0) {
+      ctx.fillStyle = '#e23b3b';
+      ctx.font = '900 110px system-ui, sans-serif';
+      ctx.fillText('VS', W / 2, cy);
+    }
+  });
+
+  if (mode === 'survivor') {
+    ctx.fillStyle = '#e23b3b';
+    ctx.font = '800 52px system-ui, sans-serif';
+    ctx.fillText('LAST BALL STANDING', W / 2, H * 0.9);
+  }
+}
+
 export function drawCountdown(ctx, value) {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.25)';

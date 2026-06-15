@@ -550,7 +550,8 @@ function rotatingRing(bodies, movers, y, rng) {
 
 // ---- Assembly: dense, varied, longer -----------------------------------
 
-export function buildCourse(rng) {
+export function buildCourse(rng, opts = {}) {
+  const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
   const bodies = [], spinnerList = [], movers = [];
   let y = 360;
 
@@ -588,5 +589,26 @@ export function buildCourse(rng) {
     clouds.push({ x: rng.range(60, W - 60), y: cy, s: rng.range(0.6, 1.2) });
   }
 
-  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds };
+  // Survivor mode: scatter eliminator hazards (red spinning blades) through the
+  // mid-lane. A ball that touches one is out. Spaced so the field thins steadily
+  // rather than all at once. Deterministic spin via the spinners list.
+  const eliminators = [];
+  if (mode === 'survivor') {
+    const first = 1500, last = finishY - 700;
+    for (let ey = first; ey < last; ey += rng.range(1500, 2100)) {
+      const ex = rng.range(330, W - 330);
+      const arm = rng.range(150, 200);
+      const a = Matter.Bodies.rectangle(ex, ey, arm, 30, { label: 'eliminator' });
+      const b2 = Matter.Bodies.rectangle(ex, ey, arm, 30, { angle: Math.PI / 2, label: 'eliminator' });
+      const blade = Matter.Body.create({
+        parts: [a, b2], isStatic: true, label: 'eliminator', restitution: 0.5,
+      });
+      blade.plugin.spinSpeed = rng.pick([-1, 1]) * rng.range(0.03, 0.05);
+      bodies.push(blade);
+      spinnerList.push(blade);
+      eliminators.push(blade);
+    }
+  }
+
+  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds, eliminators, mode };
 }

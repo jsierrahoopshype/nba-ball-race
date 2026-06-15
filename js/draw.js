@@ -56,9 +56,9 @@ export function drawWorld(ctx, race, cam) {
   ctx.scale(Z, Z);
   ctx.translate(-cam.x, -cam.y);
 
-  ctx.fillStyle = OBSTACLE;
   for (const body of race.course.bodies) {
     if (body.label === 'wall') continue;
+    ctx.fillStyle = body.label === 'eliminator' ? '#e23b3b' : OBSTACLE;
     const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
     for (const part of parts) {
       if (part.bounds.max.y < cam.y - 100 || part.bounds.min.y > cam.y + cam.visH + 100) continue;
@@ -77,7 +77,7 @@ export function drawWorld(ctx, race, cam) {
   }
 
   drawFinish(ctx, race.course.finishY);
-  for (const ball of race.balls) drawBall(ctx, ball);
+  for (const ball of race.balls) { if (!ball.plugin.ball.eliminated) drawBall(ctx, ball); }
 
   ctx.restore();
 }
