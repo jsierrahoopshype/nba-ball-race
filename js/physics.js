@@ -20,7 +20,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
   engine.positionIterations = 8;
   engine.velocityIterations = 6;
 
-  const course = buildCourse(rng, { mode });
+  const course = buildCourse(rng, { mode, preset: opts.preset });
   const balls = makeBalls(ballConfigs, rng);
   Matter.Composite.add(engine.world, [...course.bodies, ...balls]);
 

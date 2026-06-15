@@ -184,3 +184,5 @@ body {
 .ball-row.loading .chip { animation: pulse 0.8s infinite; }
 @keyframes pulse { 50% { opacity: 0.4; } }
 .btn.small.ghost { color: var(--dim); padding: 6px 9px; }
+
+.template-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

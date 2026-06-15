@@ -29,6 +29,7 @@ const ballRowsEl = document.getElementById('ball-rows');
 const winModeSelect = document.getElementById('win-mode');
 const hookInput = document.getElementById('hook-text');
 const showIntroChk = document.getElementById('show-intro');
+const coursePresetSelect = document.getElementById('course-preset');
 const bgTypeSelect = document.getElementById('bg-type');
 const bgFile = document.getElementById('bg-file');
 const bgImgBtn = document.getElementById('bg-img-btn');
@@ -181,7 +182,8 @@ const INTRO_S = 1.4;
 function startRace(seed, record = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
-  race = createRace(seed, setup.toConfigs(), { mode: raceMode });
+  const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
+  race = createRace(seed, setup.toConfigs(), { mode: raceMode, preset: racePreset });
   race.bg = currentBg();
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
@@ -264,3 +266,83 @@ btnRec.addEventListener('click', () => {
 
 seedInput.value = String(freshSeed());
 requestAnimationFrame(loop);
+
+// ---- Templates: save/load editor config as JSON --------------------------
+// Saves labels, colors, image *references* (player/team), and all the race
+// options. Uploaded ball/bg images can't be serialized, so they're skipped and
+// the ball falls back to its color until re-picked.
+const playerById = new Map(PLAYERS.map(p => [String(p[2]), p]));
+const teamByAbbr = new Map(TEAMS.map(t => [t[0], t]));
+
+function buildTemplate() {
+  return {
+    app: 'nba-ball-race', version: 1,
+    count: setup.count,
+    mode: winModeSelect.value,
+    hook: hookInput.value || '',
+    showIntro: !!(showIntroChk && showIntroChk.checked),
+    course: coursePresetSelect ? coursePresetSelect.value : 'classic',
+    bg: bgTypeSelect ? bgTypeSelect.value : 'sky',
+    balls: setup.balls.map(b => ({
+      label: b.label, name: b.name || '', color: b.color,
+      source: b.source || null, imageFit: b.imageFit || 'cover',
+    })),
+  };
+}
+
+document.getElementById('btn-save-tpl').addEventListener('click', () => {
+  const data = JSON.stringify(buildTemplate(), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ballrace-template-${setup.count}balls.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status('template saved to Downloads');
+});
+
+const tplFile = document.getElementById('tpl-file');
+tplFile.addEventListener('change', () => {
+  const f = tplFile.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { applyTemplate(JSON.parse(reader.result)); }
+    catch (e) { status(`couldn't load template: ${e.message}`); }
+    tplFile.value = '';
+  };
+  reader.readAsText(f);
+});
+
+function applyTemplate(t) {
+  if (!t || !Array.isArray(t.balls)) { status('not a valid template'); return; }
+  const n = Math.max(2, Math.min(30, t.count || t.balls.length));
+  setup.setCount(n);
+  countSelect.value = String(n);
+  t.balls.slice(0, n).forEach((bt, i) => {
+    setup.setName(i, bt.label || `P${i + 1}`);
+    if (bt.name) setup.setFullName(i, bt.name);
+    if (bt.color) setup.setColor(i, bt.color);
+    setup.clearImage(i);
+    // re-fetch image from its reference (uploads can't be restored)
+    const src = bt.source || '';
+    if (src.startsWith('player:')) {
+      const p = playerById.get(src.slice(7));
+      if (p) loadImage(HEADSHOT_URL(p[3])).then(img => { if (img) { setup.setImage(i, img, src, 'face'); refreshChip(i); } });
+    } else if (src.startsWith('team:')) {
+      const tm = teamByAbbr.get(src.slice(5));
+      if (tm) loadImage(TEAM_LOGO_URL(tm[0])).then(img => { if (img) { setup.setImage(i, img, src, 'cover'); refreshChip(i); } });
+    }
+  });
+  if (t.mode) winModeSelect.value = t.mode;
+  hookInput.value = t.hook || '';
+  if (showIntroChk) showIntroChk.checked = t.showIntro !== false;
+  if (coursePresetSelect && t.course) coursePresetSelect.value = t.course;
+  if (bgTypeSelect && t.bg) { bgTypeSelect.value = t.bg; bgImgBtn.style.display = t.bg === 'upload' ? '' : 'none'; }
+  renderRows();
+  status(`template loaded (${n} balls)`);
+}
+
+function refreshChip(i) {
+  const row = ballRowsEl.children[i];
+  if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
+}

@@ -550,11 +550,12 @@ function rotatingRing(bodies, movers, y, rng) {
 
 // ---- Assembly: dense, varied, longer -----------------------------------
 
-export function buildCourse(rng, opts = {}) {
-  const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
-  const bodies = [], spinnerList = [], movers = [];
+// ---- Course presets -----------------------------------------------------
+// Each layout returns the final y. They compose only blocks proven not to stick
+// (dots with wall semicircles, ramps, chokes, bumpers, the tested movers).
+// 'classic' is the balanced default and is left exactly as it was.
+function layoutClassic(bodies, movers, rng) {
   let y = 360;
-
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
@@ -573,6 +574,101 @@ export function buildCourse(rng, opts = {}) {
   y = seesaw(bodies, movers, y, rng);
   y = sliders(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
+  return y;
+}
+
+function layoutChaos(bodies, movers, rng) {
+  let y = 360;
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
+  y = chokePoint(bodies, y, rng);
+  y = turbine(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 3);
+  y = pendulums(bodies, movers, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 3);
+  y = sliders(bodies, movers, y, rng, 3);
+  y = chokePoint(bodies, y, rng);
+  y = turbine(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 3);
+  y = popBumpers(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 3);
+  return y;
+}
+
+function layoutGrind(bodies, movers, rng) {
+  let y = 360;
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = seesaw(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  return y;
+}
+
+function layoutPinball(bodies, movers, rng) {
+  let y = 360;
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
+  y = popBumpers(bodies, y, rng);
+  y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
+  y = popBumpers(bodies, y, rng);
+  y = chokePoint(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
+  y = ringsInField(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
+  y = popBumpers(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  return y;
+}
+
+// Shuffle: a seeded random ordering of self-contained feature segments, each
+// ending in a dot field so balls always re-settle into a sortable channel.
+function layoutShuffle(bodies, movers, rng) {
+  let y = 360;
+  y = archRamps(bodies, y, rng, 2);
+  y = bigDots(bodies, y, rng, 3);
+  const segs = [
+    (yy) => { yy = turbine(bodies, movers, yy, rng); return bigDots(bodies, yy, rng, 3); },
+    (yy) => { yy = pendulums(bodies, movers, yy, rng, 3); return bigDots(bodies, yy, rng, 3); },
+    (yy) => { yy = ringsInField(bodies, yy, rng, 2); return bigDots(bodies, yy, rng, 3); },
+    (yy) => { yy = seesaw(bodies, movers, yy, rng); return bigDots(bodies, yy, rng, 3); },
+    (yy) => { yy = sliders(bodies, movers, yy, rng, 3); return bigDots(bodies, yy, rng, 3); },
+    (yy) => { yy = popBumpers(bodies, yy, rng); return bigDots(bodies, yy, rng, 3); },
+  ];
+  // Fisher-Yates with the seeded rng
+  for (let i = segs.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [segs[i], segs[j]] = [segs[j], segs[i]];
+  }
+  segs.forEach((seg, i) => {
+    if (i % 2 === 0) y = chokePoint(bodies, y, rng); // choke before every other feature
+    y = seg(y);
+  });
+  y = bigDots(bodies, y, rng, 3);
+  return y;
+}
+
+const LAYOUTS = {
+  classic: layoutClassic, chaos: layoutChaos, grind: layoutGrind,
+  pinball: layoutPinball, shuffle: layoutShuffle,
+};
+
+export function buildCourse(rng, opts = {}) {
+  const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
+  const layout = LAYOUTS[opts.preset] || layoutClassic;
+  const bodies = [], spinnerList = [], movers = [];
+  let y = layout(bodies, movers, rng);
 
   const finishY = y + 160;
   const courseLength = finishY + 600;

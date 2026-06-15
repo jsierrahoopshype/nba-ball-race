@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=17">
+<link rel="stylesheet" href="css/editor.css?v=18">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.15</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.16</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -39,6 +39,15 @@
         <label class="count-field" style="flex:1 1 240px">hook
           <input id="hook-text" type="text" maxlength="60" placeholder="Who wins the East?" style="flex:1" />
         </label>
+        <label class="count-field">course
+          <select id="course-preset">
+            <option value="classic">Classic</option>
+            <option value="chaos">Chaos</option>
+            <option value="grind">Grind</option>
+            <option value="pinball">Pinball</option>
+            <option value="shuffle">Shuffle</option>
+          </select>
+        </label>
         <label class="count-field">bg
           <select id="bg-type">
             <option value="sky">Sky</option>
@@ -54,6 +63,12 @@
           <input id="show-intro" type="checkbox" checked /> intro card
         </label>
         <div id="ball-rows"></div>
+        <div class="template-bar">
+          <button id="btn-save-tpl" class="btn small">Save template</button>
+          <label for="tpl-file" class="btn small">Load template</label>
+          <input type="file" id="tpl-file" accept="application/json,.json" class="file-hidden" />
+          <span class="hint">saves balls, mode, hook, course &amp; background as JSON (uploaded images aren't saved)</span>
+        </div>
       </div>
     </details>
 
@@ -64,6 +79,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=17"></script>
+  <script type="module" src="js/main.js?v=18"></script>
 </body>
 </html>
