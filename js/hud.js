@@ -131,6 +131,64 @@ export function drawMatchup(ctx, balls, hook, mode) {
   }
 }
 
+// Tournament screens: the between-race round card and the final champion card.
+// `info` = { format, raceNum, wins:{id:count}, balls, championId }.
+export function drawTournamentCard(ctx, info, isChampion) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#7dd0f7'); g.addColorStop(1, '#5cb8ec');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  const need = Math.ceil(info.format / 2);
+  ctx.fillStyle = '#15151a';
+  if (isChampion) {
+    const champ = info.balls.find(b => b.plugin.ball.id === info.championId);
+    const p = champ ? champ.plugin.ball : null;
+    ctx.font = '800 56px system-ui, sans-serif';
+    ctx.fillText(`BEST OF ${info.format}`, W / 2, H * 0.12);
+    if (p) {
+      const r = 200, cx = W / 2, cy = H * 0.36;
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill(); ctx.restore();
+      if (p.image) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip(); drawBallImage(ctx, p, cx - r, cy - r, r * 2); ctx.restore(); }
+      else { ctx.fillStyle = p.textColor; ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`; ctx.fillText(p.label, cx, cy); }
+      ctx.lineWidth = 10; ctx.strokeStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#15151a'; ctx.font = '900 76px system-ui, sans-serif';
+      ctx.fillText(`${(p.name || p.label).toUpperCase()}`, W / 2, H * 0.58);
+      ctx.fillStyle = '#e23b3b'; ctx.font = '800 48px system-ui, sans-serif';
+      ctx.fillText('WINS THE SERIES', W / 2, H * 0.65);
+    }
+  } else {
+    ctx.font = '900 110px system-ui, sans-serif';
+    ctx.fillText(`RACE ${info.raceNum}`, W / 2, H * 0.16);
+    ctx.font = '700 56px system-ui, sans-serif';
+    ctx.fillText(`of ${info.format}`, W / 2, H * 0.24);
+  }
+
+  // Series score: every ball's face with its win pips
+  const scored = [...info.balls].sort((a, b) => (info.wins[b.plugin.ball.id] || 0) - (info.wins[a.plugin.ball.id] || 0));
+  const startY = isChampion ? H * 0.74 : H * 0.42;
+  const rowH = Math.min(120, (H * 0.5) / Math.max(1, scored.length));
+  const rr = Math.min(46, rowH * 0.4);
+  scored.forEach((ball, i) => {
+    const p = ball.plugin.ball, wins = info.wins[p.id] || 0;
+    const cy = startY + i * rowH, lx = W * 0.5 - 300;
+    ctx.save(); ctx.beginPath(); ctx.arc(lx, cy, rr, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
+    if (p.image) { ctx.beginPath(); ctx.arc(lx, cy, rr, 0, Math.PI * 2); ctx.clip(); drawBallImage(ctx, p, lx - rr, cy - rr, rr * 2); }
+    else { ctx.fillStyle = p.textColor; ctx.font = `800 ${Math.round(rr * 0.7)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.fillText(p.label, lx, cy); }
+    ctx.restore();
+    ctx.fillStyle = '#15151a'; ctx.textAlign = 'left'; ctx.font = '800 40px system-ui, sans-serif';
+    ctx.fillText((p.name || p.label).toUpperCase(), lx + rr + 20, cy);
+    // win pips
+    for (let w = 0; w < info.format; w++) {
+      const px = W * 0.5 + 150 + w * 52;
+      ctx.beginPath(); ctx.arc(px, cy, 18, 0, Math.PI * 2);
+      ctx.fillStyle = w < wins ? (wins >= need ? '#ffd54a' : '#4ad17a') : 'rgba(0,0,0,0.18)';
+      ctx.fill();
+    }
+  });
+}
+
 export function drawCountdown(ctx, value) {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.25)';

@@ -7,7 +7,7 @@ import { freshSeed } from './rng.js';
 import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
-import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup } from './hud.js';
+import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawTournamentCard } from './hud.js';
 import { createRecorder } from './recorder.js';
 import { createSetup } from './setup.js';
 import { loadImage } from './images.js';
@@ -206,6 +206,9 @@ function status(msg) { statusEl.textContent = msg; }
 let race = null, camera = null, mode = 'idle';
 let countdownT = 0, winnerT = 0, accumulator = 0, lastTime = null, introT = 0;
 let recordingThisRace = false, downloadFired = false;
+let tournament = null, winnerRecorded = false, cardT = 0;
+const tournamentSelect = document.getElementById('tournament');
+const CARD_S = 2.4;
 let raceHook = '', raceMode = 'finish';
 const COUNTDOWN_BEAT = 0.5;
 const INTRO_S = 1.4;
@@ -221,6 +224,7 @@ function startRace(seed, record = false) {
   camera.update(lead.position.x, lead.position.y, true);
   mode = (showIntroChk && !showIntroChk.checked) ? 'countdown' : 'intro';
   introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
+  winnerRecorded = false; cardT = 0;
   downloadFired = false; recordingThisRace = record;
   seedInput.value = String(seed);
   btnReplay.disabled = false;
@@ -264,7 +268,33 @@ function loop(now) {
     }
   } else if (mode === 'finished') {
     winnerT += dt;
-    if (winnerT > 3.2) finishRecording();
+    // Record the result into the series exactly once.
+    if (tournament && !tournament.championId && !winnerRecorded && race.winner) {
+      winnerRecorded = true;
+      const id = race.winner.plugin.ball.id;
+      tournament.wins[id] = (tournament.wins[id] || 0) + 1;
+      const need = Math.ceil(tournament.format / 2);
+      if (tournament.wins[id] >= need || tournament.raceNum >= tournament.format) {
+        tournament.championId = Object.keys(tournament.wins).sort((a, b) => tournament.wins[b] - tournament.wins[a])[0];
+      }
+    }
+    if (winnerT > 3.2) {
+      finishRecording();
+      if (tournament && !tournament.championId) { mode = 'roundcard'; cardT = 0; }
+      else if (tournament && tournament.championId) { mode = 'champion'; }
+    }
+  } else if (mode === 'roundcard') {
+    cardT += dt;
+    drawTournamentCard(ctx, tournamentInfo(), false);
+    if (cardT >= CARD_S) {
+      tournament.raceNum++;
+      startRace((tournament.baseSeed + tournament.raceNum * 7919) >>> 0);
+    }
+    return;
+  } else if (mode === 'champion') {
+    drawTournamentCard(ctx, tournamentInfo(), true);
+    status(`series winner: race ${tournament.raceNum} of ${tournament.format}`);
+    return;
   }
 
   const order = race.standings();
@@ -284,15 +314,34 @@ function loop(now) {
   }
 }
 
+// Snapshot of the series for the round/champion cards (uses current race balls).
+function tournamentInfo() {
+  return {
+    format: tournament.format, raceNum: tournament.raceNum,
+    wins: tournament.wins, balls: race.balls, championId: tournament.championId,
+  };
+}
+
+// Begin from the UI: start a single race, or kick off a tournament series.
+function beginRace(seed, record = false) {
+  const format = tournamentSelect ? parseInt(tournamentSelect.value, 10) : 1;
+  if (format > 1) {
+    tournament = { format, raceNum: 1, wins: {}, baseSeed: seed >>> 0, championId: null };
+  } else {
+    tournament = null;
+  }
+  startRace(seed, record);
+}
+
 btnRace.addEventListener('click', () => {
   const v = parseInt(seedInput.value, 10);
-  startRace(Number.isFinite(v) ? (v >>> 0) : freshSeed());
+  beginRace(Number.isFinite(v) ? (v >>> 0) : freshSeed());
 });
-btnReplay.addEventListener('click', () => { if (race) startRace(race.seed); });
-btnNew.addEventListener('click', () => startRace(freshSeed()));
+btnReplay.addEventListener('click', () => { if (race) { tournament = null; startRace(race.seed); } });
+btnNew.addEventListener('click', () => beginRace(freshSeed()));
 btnRec.addEventListener('click', () => {
   const v = parseInt(seedInput.value, 10);
-  startRace(Number.isFinite(v) ? (v >>> 0) : freshSeed(), true);
+  beginRace(Number.isFinite(v) ? (v >>> 0) : freshSeed(), true);
 });
 
 seedInput.value = String(freshSeed());
