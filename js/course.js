@@ -550,6 +550,19 @@ function rotatingRing(bodies, movers, y, rng) {
 
 // ---- Assembly: dense, varied, longer -----------------------------------
 
+// Narrow finish: two big smooth bulges funnel the whole field into a tight gate
+// (~240px) right at the goal line. Makes the end hard, kills free-fall to the
+// line, and forces a bottleneck finish instead of a wide-open drop-in.
+function finishFunnel(bodies, y, rng) {
+  const R = 340, gate = 235;
+  const cy = y + R - 90;
+  const xL = (W - gate) / 2 - R;
+  const xR = (W + gate) / 2 + R;
+  bodies.push(peg(xL, cy, R, { restitution: 0.35, friction: 0.006 }));
+  bodies.push(peg(xR, cy, R, { restitution: 0.35, friction: 0.006 }));
+  return cy; // the gate (narrowest point) is the goal line
+}
+
 // ---- Course presets -----------------------------------------------------
 // Each layout returns the final y. They compose only blocks proven not to stick
 // (dots with wall semicircles, ramps, chokes, bumpers, the tested movers).
@@ -571,12 +584,6 @@ function layoutClassic(bodies, movers, rng) {
   y = ringsInField(bodies, y, rng, 2);
   y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 3);
-  y = seesaw(bodies, movers, y, rng);
-  y = chokePoint(bodies, y, rng);
-  y = popBumpers(bodies, y, rng);
-  y = bigDots(bodies, y, rng, 3);
-  y = sliders(bodies, movers, y, rng, 3);
   y = bigDots(bodies, y, rng, 3);
   return y;
 }
@@ -674,7 +681,11 @@ export function buildCourse(rng, opts = {}) {
   const bodies = [], spinnerList = [], movers = [];
   let y = layout(bodies, movers, rng);
 
-  const finishY = y + 160;
+  // Shared hard finish for every preset: one last dense bumper scatter then a
+  // narrow funnel gate. No free-fall to the line; the goal is a tight bottleneck.
+  y = popBumpers(bodies, y, rng);
+  const finishY = finishFunnel(bodies, y, rng);
+
   const courseLength = finishY + 600;
 
   // (edge posts temporarily disabled for isolation)
@@ -710,25 +721,39 @@ export function buildCourse(rng, opts = {}) {
     }
   }
 
-  // Analyst obstacles: big face-bodies the balls physically bounce off, spread
-  // down the lane (off the walls so they don't wedge). Passed in via opts;
-  // drawn with a headshot + speech bubble by draw.js. Cosmetic identity only,
-  // the physics is just a big peg.
+  // Analyst obstacles: a MASSIVE face the balls bounce off, with a comic speech
+  // bubble that ORBITS the face as its own moving obstacle. Spread down the lane,
+  // kept central so the orbit stays off the walls.
   const analysts = [];
   const aList = opts.analysts || [];
   if (aList.length) {
-    const top = 1300, bot = finishY - 900, span = Math.max(1, bot - top);
+    const top = 1500, bot = finishY - 1300, span = Math.max(1, bot - top);
     aList.forEach((a, i) => {
+      const faceR = 185, bubbleR = 80, orbitR = faceR + bubbleR + 30;
       const ay = top + span * (i + 0.5) / aList.length + rng.range(-160, 160);
-      const ax = rng.range(360, W - 360);
-      const body = peg(ax, ay, 94, { restitution: 0.55, friction: 0.004 });
-      body.label = 'analyst';
-      body.plugin.analyst = {
-        name: a.name || '', image: a.image || null,
-        speech: a.speech || '', bubbleSide: ax < W / 2 ? 'R' : 'L',
-      };
-      bodies.push(body);
-      analysts.push(body);
+      const margin = orbitR + bubbleR + 20;
+      const ax = rng.range(margin, W - margin);
+      const face = peg(ax, ay, faceR, { restitution: 0.5, friction: 0.004 });
+      face.label = 'analyst';
+      face.plugin.analyst = { name: a.name || '', image: a.image || null, speech: a.speech || '', bubbleBody: null };
+      bodies.push(face);
+      analysts.push(face);
+
+      if (a.speech && a.speech.trim()) {
+        const bubble = Matter.Bodies.circle(ax + orbitR, ay, bubbleR,
+          { isStatic: true, label: 'analystbubble', restitution: 0.8, friction: 0.002 });
+        const spin = rng.pick([-1, 1]) * rng.range(0.012, 0.02);
+        const phase = rng.range(0, Math.PI * 2);
+        bubble.plugin.bubble = { cx: ax, cy: ay, orbitR, faceR, speech: a.speech.trim() };
+        bodies.push(bubble);
+        face.plugin.analyst.bubbleBody = bubble;
+        movers.push({
+          update: (step) => {
+            const ang = phase + step * spin;
+            Matter.Body.setPosition(bubble, { x: ax + Math.cos(ang) * orbitR, y: ay + Math.sin(ang) * orbitR });
+          },
+        });
+      }
     });
   }
 

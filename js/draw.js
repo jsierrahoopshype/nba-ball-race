@@ -14,14 +14,16 @@ export function drawImageCover(ctx, img, x, y, size) {
   ctx.drawImage(img, sx, sy, s, s, x, y, size, size);
 }
 
-// Face-fit crop for NBA headshots: their face content sits in the center ~60%
-// with transparent sides and the head fills the height, so a plain square crop
-// reads as a narrow strip. This crops a square biased toward the face and fills
-// the circle with it.
+// Face-fit crop for NBA headshots. These are transparent cutouts whose bg
+// removal also punched out white pixels (teeth, eye-whites), so we paint a
+// neutral backing first, otherwise the circle's team color shows through those
+// holes (purple teeth). Always called inside a circle clip, so the fill is round.
 export function drawFace(ctx, img, x, y, size) {
-  const side = Math.min(img.width, img.height) * 0.80;
+  ctx.fillStyle = '#eef0f3';
+  ctx.fillRect(x, y, size, size);
+  const side = Math.min(img.width, img.height) * 0.86;
   const sx = img.width * 0.5 - side / 2;
-  const sy = img.height * 0.44 - side / 2;
+  const sy = img.height * 0.42 - side / 2;
   ctx.drawImage(img, sx, sy, side, side, x, y, size, size);
 }
 
@@ -55,7 +57,7 @@ export function drawWorld(ctx, race, cam) {
   ctx.translate(-cam.x, -cam.y);
 
   for (const body of race.course.bodies) {
-    if (body.label === 'wall' || body.label === 'analyst') continue;
+    if (body.label === 'wall' || body.label === 'analyst' || body.label === 'analystbubble') continue;
     ctx.fillStyle = body.label === 'eliminator' ? '#e23b3b' : OBSTACLE;
     const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
     for (const part of parts) {
@@ -79,7 +81,7 @@ export function drawWorld(ctx, race, cam) {
   // Analyst face obstacles + speech bubbles (world space, above obstacles)
   for (const body of (race.course.analysts || [])) {
     const a = body.plugin.analyst;
-    if (body.bounds.max.y < cam.y - 200 || body.bounds.min.y > cam.y + cam.visH + 200) continue;
+    if (body.bounds.max.y < cam.y - 450 || body.bounds.min.y > cam.y + cam.visH + 450) continue;
     drawAnalyst(ctx, body, a);
   }
 
@@ -134,11 +136,12 @@ function drawBackground(ctx, bg, race, cam, W, H) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
 
-// Analyst obstacle: headshot in a ringed disk, with a speech bubble alongside.
+// Analyst: a massive headshot the balls bounce off, with a comic speech bubble
+// orbiting it (the bubble is its own moving obstacle, positioned by the engine).
 function drawAnalyst(ctx, body, a) {
   const x = body.position.x, y = body.position.y, r = body.circleRadius;
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = '#1b1d27'; ctx.fill();
   ctx.restore();
@@ -147,36 +150,52 @@ function drawAnalyst(ctx, body, a) {
     drawFace(ctx, a.image, x - r, y - r, r * 2); ctx.restore();
   } else {
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `800 ${Math.round(r * 0.5)}px system-ui, sans-serif`;
-    ctx.fillText((a.name || '?').slice(0, 3).toUpperCase(), x, y);
+    ctx.font = `900 ${Math.round(r * 0.42)}px system-ui, sans-serif`;
+    ctx.fillText((a.name || '?').slice(0, 6).toUpperCase(), x, y);
   }
-  ctx.lineWidth = 6; ctx.strokeStyle = '#ffd54a';
+  ctx.lineWidth = 10; ctx.strokeStyle = '#ffd54a';
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 
-  if (a.speech && a.speech.trim()) {
-    const right = a.bubbleSide === 'R';
-    const bw = 300, pad = 18, lh = 34;
-    ctx.font = '700 28px system-ui, sans-serif';
-    const words = a.speech.trim().split(/\s+/); const lines = []; let line = '';
-    for (const w of words) {
-      const t = line ? line + ' ' + w : w;
-      if (ctx.measureText(t).width > bw - pad * 2 && line) { lines.push(line); line = w; }
-      else line = t;
-    }
-    if (line) lines.push(line);
-    const bh = lines.length * lh + pad * 2;
-    const bx = right ? x + r + 24 : x - r - 24 - bw;
-    const by = y - bh / 2;
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#15151a'; ctx.lineWidth = 4;
-    roundRectPath(ctx, bx, by, bw, bh, 18); ctx.fill(); ctx.stroke();
-    // tail toward the face
-    ctx.beginPath();
-    const tx = right ? bx : bx + bw;
-    ctx.moveTo(tx, y - 14); ctx.lineTo(tx + (right ? -22 : 22), y); ctx.lineTo(tx, y + 14);
-    ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill();
-    ctx.fillStyle = '#15151a'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    lines.forEach((ln, i) => ctx.fillText(ln, bx + pad, by + pad + i * lh));
+  // Orbiting comic bubble (drawn at the engine-positioned bubble body)
+  const bub = a.bubbleBody;
+  if (bub && bub.plugin.bubble && bub.plugin.bubble.speech) {
+    drawComicBubble(ctx, bub.position.x, bub.position.y, bub.circleRadius, bub.plugin.bubble.speech, x, y);
   }
+}
+
+// Classic comic word balloon: white ellipse, thick black outline, a triangular
+// tail aimed back at the speaker (the face), with the line inside.
+function drawComicBubble(ctx, x, y, r, text, faceX, faceY) {
+  const rx = r * 1.5, ry = r * 1.12;
+  // tail toward the face
+  const ang = Math.atan2(faceY - y, faceX - x);
+  const tipX = x + Math.cos(ang) * (r + 46), tipY = y + Math.sin(ang) * (r + 46);
+  const bx = x + Math.cos(ang) * (rx * 0.7), by = y + Math.sin(ang) * (ry * 0.7);
+  const perp = ang + Math.PI / 2, tw = 26;
+  ctx.save();
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#15151a'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
+  // tail (drawn first, outlined with body)
+  ctx.beginPath();
+  ctx.moveTo(bx + Math.cos(perp) * tw, by + Math.sin(perp) * tw);
+  ctx.lineTo(tipX, tipY);
+  ctx.lineTo(bx - Math.cos(perp) * tw, by - Math.sin(perp) * tw);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // balloon
+  ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // text (wrapped, uppercase comic)
+  ctx.fillStyle = '#15151a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let fs = 34; ctx.font = `900 ${fs}px system-ui, sans-serif`;
+  const words = text.toUpperCase().split(/\s+/); const lines = []; let line = '';
+  const maxW = rx * 1.5;
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+  }
+  if (line) lines.push(line);
+  while (lines.length * fs > ry * 1.7 && fs > 18) { fs -= 2; ctx.font = `900 ${fs}px system-ui, sans-serif`; }
+  const lh = fs + 4, startY = y - (lines.length - 1) * lh / 2;
+  lines.forEach((ln, i) => ctx.fillText(ln, x, startY + i * lh));
+  ctx.restore();
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
