@@ -8,6 +8,7 @@ import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
 import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawTournamentCard } from './hud.js';
+import { exportHQ, webCodecsSupported } from './hqexport.js';
 import { createRecorder } from './recorder.js';
 import { createSetup } from './setup.js';
 import { loadImage } from './images.js';
@@ -217,8 +218,14 @@ function startRace(seed, record = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
-  race = createRace(seed, setup.toConfigs(), { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias() });
+  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias() };
+  race = createRace(seed, setup.toConfigs(), raceOpts);
   race.bg = currentBg();
+  // remember exactly how this race was built so HQ export reproduces it
+  race._params = {
+    seed, configs: setup.toConfigs(), opts: { ...raceOpts, bg: race.bg },
+    hook: raceHook, showIntro: !!(showIntroChk && showIntroChk.checked),
+  };
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
   camera.update(lead.position.x, lead.position.y, true);
@@ -342,6 +349,40 @@ btnNew.addEventListener('click', () => beginRace(freshSeed()));
 btnRec.addEventListener('click', () => {
   const v = parseInt(seedInput.value, 10);
   beginRace(Number.isFinite(v) ? (v >>> 0) : freshSeed(), true);
+});
+
+// HQ MP4: offline deterministic render of the current race (or the current
+// editor setup if none has run yet) to a full-quality MP4.
+const btnHq = document.getElementById('btn-hq');
+let hqBusy = false;
+btnHq.addEventListener('click', async () => {
+  if (hqBusy) return;
+  if (!webCodecsSupported()) { status('HQ MP4 needs Chrome or Edge (WebCodecs).'); return; }
+  // Use the exact params of the race on screen; otherwise build from the editor.
+  const params = (race && race._params) ? race._params : {
+    seed: (parseInt(seedInput.value, 10) >>> 0) || freshSeed(),
+    configs: setup.toConfigs(),
+    opts: { mode: winModeSelect.value === 'survivor' ? 'survivor' : 'finish',
+      preset: coursePresetSelect ? coursePresetSelect.value : 'classic',
+      analysts: buildAnalystsForRace(), bias: currentBias(), bg: currentBg() },
+    hook: hookInput.value || '', showIntro: !!(showIntroChk && showIntroChk.checked),
+  };
+  hqBusy = true; btnHq.disabled = true; btnRace.disabled = true;
+  try {
+    const result = await exportHQ(params, (phase, f, total) => {
+      const pct = total ? Math.min(99, Math.round((f / total) * 100)) : 0;
+      status(phase === 'encoding' ? `HQ MP4: encoding ${f} frames…` : `HQ MP4: rendering ${phase} ${pct}%`);
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(result.blob);
+    a.download = result.filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    status(`HQ MP4 saved to Downloads (${result.frames} frames)`);
+  } catch (e) {
+    status(`HQ MP4 failed: ${e.message}`);
+  } finally {
+    hqBusy = false; btnHq.disabled = false; btnRace.disabled = false;
+  }
 });
 
 seedInput.value = String(freshSeed());

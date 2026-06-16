@@ -729,7 +729,7 @@ export function buildCourse(rng, opts = {}) {
   if (aList.length) {
     const top = 1500, bot = finishY - 1300, span = Math.max(1, bot - top);
     aList.forEach((a, i) => {
-      const faceR = 185, bubbleR = 80, orbitR = faceR + bubbleR + 30;
+      const faceR = 215, bubbleR = 76, orbitR = faceR + bubbleR + 28;
       const ay = top + span * (i + 0.5) / aList.length + rng.range(-160, 160);
       const margin = orbitR + bubbleR + 20;
       const ax = rng.range(margin, W - margin);
