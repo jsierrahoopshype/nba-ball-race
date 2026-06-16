@@ -195,3 +195,7 @@ body {
 .analyst-row .a-name { width: 90px; }
 .analyst-row .a-pick { width: 150px; }
 .analyst-row .a-speech { flex: 1 1 140px; }
+
+.ball-row .luck { display: flex; align-items: center; gap: 4px; }
+.ball-row .luck input[type=range] { width: 70px; }
+.ball-row .luck-val { width: 30px; font-size: 12px; font-weight: 700; text-align: right; }

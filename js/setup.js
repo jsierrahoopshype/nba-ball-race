@@ -21,6 +21,7 @@ export function createSetup(initialCount = 2) {
         image: null,     // HTMLImageElement once a player/team/upload resolves
         source: null,
         imageFit: 'cover',
+        luck: 1,         // bias: 0.5–2 odds multiplier (1 = neutral)
       });
     }
     return balls.length;
@@ -35,6 +36,7 @@ export function createSetup(initialCount = 2) {
     setName: (i, v) => { if (balls[i]) balls[i].label = v; },
     setFullName: (i, v) => { if (balls[i]) balls[i].name = v; },
     setColor: (i, v) => { if (balls[i]) balls[i].color = v; },
+    setLuck: (i, v) => { if (balls[i]) balls[i].luck = v; },
     setImage: (i, img, source, fit) => { if (balls[i]) { balls[i].image = img; balls[i].source = source; balls[i].imageFit = fit || 'cover'; } },
     clearImage: (i) => { if (balls[i]) { balls[i].image = null; balls[i].source = null; } },
     // The exact array createRace() consumes. THIS is what RACE uses.

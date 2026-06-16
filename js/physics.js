@@ -12,6 +12,7 @@ import { makeBalls } from './balls.js';
 export function createRace(seed, ballConfigs, opts = {}) {
   const rng = createRNG(seed);
   const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
+  const bias = opts.bias && opts.bias.preset !== undefined ? opts.bias : (opts.bias || null);
 
   const engine = Matter.Engine.create({
     enableSleeping: false,
@@ -48,6 +49,37 @@ export function createRace(seed, ballConfigs, opts = {}) {
     finished: false,
   };
 
+  // Bias: invisible, deterministic forces that SHIFT a ball's odds (never a
+  // guarantee). Per-ball luck is a steady nudge; presets add situational pulls.
+  // Strengths are intentionally small so chaos still decides most races.
+  function applyBias(ball, p, leadY) {
+    const m = ball.mass;
+    const luck = (bias.luck && bias.luck[p.id]) || 1;
+    if (luck !== 1) Matter.Body.applyForce(ball, ball.position, { x: 0, y: (luck - 1) * CONFIG.LUCK_FORCE * m });
+
+    const preset = bias.preset;
+    if (!preset || preset === 'none') return;
+    const F = CONFIG.BIAS_FORCE * m;
+    const behind = leadY - ball.position.y;
+    const isLeader = behind <= 40;
+    const lateRace = ball.position.y > course.finishY * 0.68;
+
+    if (preset === 'underdog') {
+      if (behind > 200) Matter.Body.applyForce(ball, ball.position, { x: 0, y: F * Math.min(1, behind / 2600) });
+    } else if (preset === 'clutch') {
+      if (lateRace && behind > 150) Matter.Body.applyForce(ball, ball.position, { x: 0, y: F * 1.3 * Math.min(1, behind / 2000) });
+    } else if (preset === 'chokerisk') {
+      if (lateRace && isLeader) Matter.Body.applyForce(ball, ball.position, { x: 0, y: -F * 0.6 });
+    } else if (preset === 'lebronhate') {
+      if (bias.hateId === p.id) Matter.Body.applyForce(ball, ball.position, { x: 0, y: -F * 0.7 });
+    } else if (preset === 'mediapressure') {
+      for (const an of course.analysts) {
+        const dx = ball.position.x - an.position.x, dy = ball.position.y - an.position.y;
+        if (dx * dx + dy * dy < 250 * 250) { Matter.Body.applyForce(ball, ball.position, { x: 0, y: -F * 0.55 }); break; }
+      }
+    }
+  }
+
   function placeFinish(ball) {
     const p = ball.plugin.ball;
     if (p.finished || p.eliminated) return;
@@ -74,10 +106,16 @@ export function createRace(seed, ballConfigs, opts = {}) {
     for (const s of course.spinners) Matter.Body.setAngle(s, s.angle + s.plugin.spinSpeed);
     for (const m of course.movers) m.update(race.step);
 
+    // Leader position this tick (for bias presets that target leader/laggards)
+    let leadY = -Infinity;
+    if (bias) for (const b of balls) { const q = b.plugin.ball; if (!q.finished && !q.eliminated && b.position.y > leadY) leadY = b.position.y; }
+
 
     for (const ball of balls) {
       const p = ball.plugin.ball;
       if (p.finished || p.eliminated) continue;
+
+      if (bias) applyBias(ball, p, leadY);
 
       // Velocity cap: stops fast balls tunneling through thin obstacles
       const v = ball.velocity;

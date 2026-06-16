@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=19">
+<link rel="stylesheet" href="css/editor.css?v=20">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.17</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.18</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -38,6 +38,16 @@
         </label>
         <label class="count-field" style="flex:1 1 240px">hook
           <input id="hook-text" type="text" maxlength="60" placeholder="Who wins the East?" style="flex:1" />
+        </label>
+        <label class="count-field">bias
+          <select id="bias-preset" title="Invisible odds-shifting presets">
+            <option value="none">None (fair)</option>
+            <option value="underdog">Underdog Boost</option>
+            <option value="clutch">Clutch Mode</option>
+            <option value="chokerisk">Choke Risk</option>
+            <option value="lebronhate">LeBron Hate</option>
+            <option value="mediapressure">Media Pressure</option>
+          </select>
         </label>
         <label class="count-field">course
           <select id="course-preset">
@@ -88,6 +98,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=19"></script>
+  <script type="module" src="js/main.js?v=20"></script>
 </body>
 </html>

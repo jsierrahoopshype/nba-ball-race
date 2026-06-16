@@ -34,6 +34,9 @@ export const CONFIG = {
   // Race timing
   HARD_TIMEOUT_S: 120,
   TAIL_S: 14,              // after the winner finishes, force-place any ball still going
+
+  LUCK_FORCE: 0.00016,     // per-ball luck: steady nudge per (luck-1). Subtle: shifts odds, never guarantees
+  BIAS_FORCE: 0.0012,      // strength of preset bias pulls (underdog/clutch/choke/etc.)
   SURGE_ZONE: 0.72,        // last fraction of course where trailing balls catch up
   SURGE_FORCE: 0.0016,     // strength of the late catch-up (keeps finishes close)
 };

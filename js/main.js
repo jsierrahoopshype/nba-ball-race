@@ -30,6 +30,20 @@ const winModeSelect = document.getElementById('win-mode');
 const hookInput = document.getElementById('hook-text');
 const showIntroChk = document.getElementById('show-intro');
 const coursePresetSelect = document.getElementById('course-preset');
+const biasPresetSelect = document.getElementById('bias-preset');
+
+// Build the bias config: per-ball luck + the chosen preset. Invisible at runtime.
+function currentBias() {
+  const preset = biasPresetSelect ? biasPresetSelect.value : 'none';
+  const luck = {};
+  setup.balls.forEach((b, i) => { if (b.luck && b.luck !== 1) luck[`b${i + 1}`] = b.luck; });
+  let hateId = null;
+  if (preset === 'lebronhate') {
+    const idx = setup.balls.findIndex(b => /lebron|lbj/i.test(`${b.name || ''} ${b.label || ''}`));
+    hateId = `b${(idx >= 0 ? idx : 0) + 1}`;
+  }
+  return { preset, luck, hateId };
+}
 const bgTypeSelect = document.getElementById('bg-type');
 const bgFile = document.getElementById('bg-file');
 const bgImgBtn = document.getElementById('bg-img-btn');
@@ -140,7 +154,24 @@ function renderRows() {
     clear.className = 'btn small ghost'; clear.textContent = '×'; clear.title = 'Clear image';
     clear.addEventListener('click', () => { setup.clearImage(i); pick.value = ''; chip.textContent = ''; });
 
-    row.append(chip, name, color, pick, fileBtn, file, clear);
+    // Bias: per-ball luck (0.5–2x). Neutral at 1. Invisible during the race.
+    const luckWrap = document.createElement('label');
+    luckWrap.className = 'luck';
+    const luck = document.createElement('input');
+    luck.type = 'range'; luck.min = '0.5'; luck.max = '2'; luck.step = '0.1';
+    luck.value = String(b.luck || 1);
+    const luckVal = document.createElement('span');
+    luckVal.className = 'luck-val'; luckVal.textContent = `${(b.luck || 1).toFixed(1)}x`;
+    luck.title = 'Luck: shifts this ball\u2019s odds (never guarantees)';
+    luck.addEventListener('input', () => {
+      const v = parseFloat(luck.value); setup.setLuck(i, v);
+      luckVal.textContent = `${v.toFixed(1)}x`;
+      luckVal.style.color = v > 1 ? '#4ad17a' : (v < 1 ? '#e2683b' : '#9a9aa6');
+    });
+    luckVal.style.color = (b.luck || 1) > 1 ? '#4ad17a' : ((b.luck || 1) < 1 ? '#e2683b' : '#9a9aa6');
+    luckWrap.append(luck, luckVal);
+
+    row.append(chip, name, color, pick, fileBtn, file, clear, luckWrap);
     ballRowsEl.appendChild(row);
   });
 }
@@ -183,7 +214,7 @@ function startRace(seed, record = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
-  race = createRace(seed, setup.toConfigs(), { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace() });
+  race = createRace(seed, setup.toConfigs(), { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias() });
   race.bg = currentBg();
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
@@ -283,10 +314,11 @@ function buildTemplate() {
     showIntro: !!(showIntroChk && showIntroChk.checked),
     course: coursePresetSelect ? coursePresetSelect.value : 'classic',
     bg: bgTypeSelect ? bgTypeSelect.value : 'sky',
+    bias: biasPresetSelect ? biasPresetSelect.value : 'none',
     analysts: analysts.map(a => ({ name: a.name, source: a.source || null, speech: a.speech || '' })),
     balls: setup.balls.map(b => ({
       label: b.label, name: b.name || '', color: b.color,
-      source: b.source || null, imageFit: b.imageFit || 'cover',
+      source: b.source || null, imageFit: b.imageFit || 'cover', luck: b.luck || 1,
     })),
   };
 }
@@ -323,6 +355,7 @@ function applyTemplate(t) {
     setup.setName(i, bt.label || `P${i + 1}`);
     if (bt.name) setup.setFullName(i, bt.name);
     if (bt.color) setup.setColor(i, bt.color);
+    if (bt.luck != null) setup.setLuck(i, bt.luck);
     setup.clearImage(i);
     // re-fetch image from its reference (uploads can't be restored)
     const src = bt.source || '';
@@ -338,6 +371,7 @@ function applyTemplate(t) {
   hookInput.value = t.hook || '';
   if (showIntroChk) showIntroChk.checked = t.showIntro !== false;
   if (coursePresetSelect && t.course) coursePresetSelect.value = t.course;
+  if (biasPresetSelect && t.bias) biasPresetSelect.value = t.bias;
   if (bgTypeSelect && t.bg) { bgTypeSelect.value = t.bg; bgImgBtn.style.display = t.bg === 'upload' ? '' : 'none'; }
   analysts = (t.analysts || []).map(a => ({ name: a.name || '', source: a.source || null, speech: a.speech || '', image: null }));
   renderAnalystRows();
