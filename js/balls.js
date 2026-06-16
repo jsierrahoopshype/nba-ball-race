@@ -35,7 +35,10 @@ export function ballRadiusForCount(n) {
 export function makeBalls(configs, rng) {
   const n = configs.length;
   const radius = ballRadiusForCount(n);
-  const slotW = Math.min(150, (CONFIG.WORLD_W - 220) / Math.max(1, n - 1));
+  // Tight central cluster: just over one ball-width between slots, so the field
+  // drops together and fights immediately instead of outer balls getting clean
+  // side lanes. Still wide enough that they never overlap at spawn.
+  const slotW = Math.min(2 * radius + 14, (CONFIG.WORLD_W - 220) / Math.max(1, n - 1));
   const startX = CONFIG.WORLD_W / 2 - slotW * (n - 1) / 2;
 
   // Seeded shuffle of start slots: the course can have a faster side, so we

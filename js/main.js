@@ -493,7 +493,7 @@ function renderAnalystRows() {
     pick.addEventListener('change', () => resolveAnalystPick(i, pick.value));
     const speech = document.createElement('input'); speech.className = 'a-speech'; speech.placeholder = 'speech bubble'; speech.maxLength = 40; speech.value = a.speech || '';
     speech.addEventListener('input', () => { a.speech = speech.value; });
-    const star = document.createElement('button'); star.className = 'btn small'; star.textContent = '★'; star.title = 'save to library';
+    const star = document.createElement('button'); star.className = 'btn small'; star.textContent = '★ Save'; star.title = 'save this analyst to your library';
     star.addEventListener('click', () => {
       if (!a.name && !a.source) { status('name the analyst first'); return; }
       const lib = loadLibrary(); lib.push({ name: a.name || '', source: a.source || null, speech: a.speech || '' });

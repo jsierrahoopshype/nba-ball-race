@@ -557,23 +557,27 @@ function rotatingRing(bodies, movers, y, rng) {
 function layoutClassic(bodies, movers, rng) {
   let y = 360;
   y = archRamps(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 4);
+  y = bigDots(bodies, y, rng, 3);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
   y = bigDots(bodies, y, rng, 3);
-  y = pendulums(bodies, movers, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 3);
-  y = ringsInField(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 4);
+  y = pendulums(bodies, movers, y, rng, 3);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
   y = bigDots(bodies, y, rng, 3);
+  y = ringsInField(bodies, y, rng, 2);
+  y = chokePoint(bodies, y, rng);
+  y = turbine(bodies, movers, y, rng);
+  y = bigDots(bodies, y, rng, 3);
   y = seesaw(bodies, movers, y, rng);
+  y = chokePoint(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 3);
   y = sliders(bodies, movers, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
+  y = bigDots(bodies, y, rng, 3);
   return y;
 }
 
