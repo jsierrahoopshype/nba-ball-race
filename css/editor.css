@@ -199,3 +199,5 @@ body {
 .ball-row .luck { display: flex; align-items: center; gap: 4px; }
 .ball-row .luck input[type=range] { width: 70px; }
 .ball-row .luck-val { width: 30px; font-size: 12px; font-weight: 700; text-align: right; }
+
+.analyst-row .a-emoji { width: 70px; }

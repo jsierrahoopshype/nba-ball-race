@@ -405,7 +405,7 @@ function buildTemplate() {
     course: coursePresetSelect ? coursePresetSelect.value : 'classic',
     bg: bgTypeSelect ? bgTypeSelect.value : 'sky',
     bias: biasPresetSelect ? biasPresetSelect.value : 'none',
-    analysts: analysts.map(a => ({ name: a.name, source: a.source || null, speech: a.speech || '' })),
+    analysts: analysts.map(a => ({ name: a.name, source: a.source || null, speech: a.speech || '', emoji: a.emoji || '' })),
     balls: setup.balls.map(b => ({
       label: b.label, name: b.name || '', color: b.color,
       source: b.source || null, imageFit: b.imageFit || 'cover', luck: b.luck || 1,
@@ -463,7 +463,7 @@ function applyTemplate(t) {
   if (coursePresetSelect && t.course) coursePresetSelect.value = t.course;
   if (biasPresetSelect && t.bias) biasPresetSelect.value = t.bias;
   if (bgTypeSelect && t.bg) { bgTypeSelect.value = t.bg; bgImgBtn.style.display = t.bg === 'upload' ? '' : 'none'; }
-  analysts = (t.analysts || []).map(a => ({ name: a.name || '', source: a.source || null, speech: a.speech || '', image: null }));
+  analysts = (t.analysts || []).map(a => ({ name: a.name || '', source: a.source || null, speech: a.speech || '', emoji: a.emoji || '', image: null }));
   renderAnalystRows();
   analysts.forEach(async (a, idx) => { if (a.source) { const img = await resolveImageFromSource(a.source); if (img) { a.image = img; markAnalystChip(idx); } } });
   renderRows();
@@ -534,22 +534,25 @@ function renderAnalystRows() {
     pick.addEventListener('change', () => resolveAnalystPick(i, pick.value));
     const speech = document.createElement('input'); speech.className = 'a-speech'; speech.placeholder = 'speech bubble'; speech.maxLength = 40; speech.value = a.speech || '';
     speech.addEventListener('input', () => { a.speech = speech.value; });
+    const emoji = document.createElement('input'); emoji.className = 'a-emoji'; emoji.placeholder = '🔥💀'; emoji.maxLength = 8; emoji.value = a.emoji || '';
+    emoji.title = 'emojis to orbit the face as obstacles (up to 4)';
+    emoji.addEventListener('input', () => { a.emoji = emoji.value; });
     const star = document.createElement('button'); star.className = 'btn small'; star.textContent = '★ Save'; star.title = 'save this analyst to your library';
     star.addEventListener('click', () => {
       if (!a.name && !a.source) { status('name the analyst first'); return; }
-      const lib = loadLibrary(); lib.push({ name: a.name || '', source: a.source || null, speech: a.speech || '' });
+      const lib = loadLibrary(); lib.push({ name: a.name || '', source: a.source || null, speech: a.speech || '', emoji: a.emoji || '' });
       saveLibrary(lib); refreshLibraryDropdown(); status(`saved ${a.name || 'character'} to library`);
     });
     const del = document.createElement('button'); del.className = 'btn small'; del.textContent = '×'; del.title = 'remove';
     del.addEventListener('click', () => { analysts.splice(i, 1); renderAnalystRows(); });
-    row.append(chip, name, pick, speech, star, del);
+    row.append(chip, name, pick, speech, emoji, star, del);
     analystRowsEl.appendChild(row);
   });
 }
 
 document.getElementById('btn-add-analyst').addEventListener('click', () => {
   if (analysts.length >= 8) { status('8 analysts max'); return; }
-  analysts.push({ name: '', source: null, speech: '', image: null });
+  analysts.push({ name: '', source: null, speech: '', emoji: '', image: null });
   renderAnalystRows();
 });
 
@@ -557,14 +560,14 @@ charLibrarySelect.addEventListener('change', async () => {
   const idx = charLibrarySelect.value; if (idx === '') return;
   const c = loadLibrary()[+idx]; charLibrarySelect.value = '';
   if (!c) return;
-  const a = { name: c.name || '', source: c.source || null, speech: c.speech || '', image: null };
+  const a = { name: c.name || '', source: c.source || null, speech: c.speech || '', emoji: c.emoji || '', image: null };
   analysts.push(a); renderAnalystRows();
   if (a.source) { const img = await resolveImageFromSource(a.source); if (img) { a.image = img; markAnalystChip(analysts.indexOf(a)); } }
 });
 
 // Resolved analyst list for the race (only those with a face or a name)
 function buildAnalystsForRace() {
-  return analysts.filter(a => a.image || a.name).map(a => ({ name: a.name, image: a.image, speech: a.speech }));
+  return analysts.filter(a => a.image || a.name).map(a => ({ name: a.name, image: a.image, speech: a.speech, emoji: a.emoji }));
 }
 
 refreshLibraryDropdown();

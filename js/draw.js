@@ -57,7 +57,7 @@ export function drawWorld(ctx, race, cam) {
   ctx.translate(-cam.x, -cam.y);
 
   for (const body of race.course.bodies) {
-    if (body.label === 'wall' || body.label === 'analyst' || body.label === 'analystbubble') continue;
+    if (body.label === 'wall' || body.label === 'analyst' || body.label === 'analystbubble' || body.label === 'analystemoji') continue;
     ctx.fillStyle = body.label === 'eliminator' ? '#e23b3b' : OBSTACLE;
     const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
     for (const part of parts) {
@@ -161,38 +161,54 @@ function drawAnalyst(ctx, body, a) {
   if (bub && bub.plugin.bubble && bub.plugin.bubble.speech) {
     drawComicBubble(ctx, bub.position.x, bub.position.y, bub.circleRadius, bub.plugin.bubble.speech, x, y);
   }
+  // Orbiting emoji obstacles
+  for (const eb of (a.emojiBodies || [])) {
+    const ex = eb.position.x, ey = eb.position.y, er = eb.circleRadius;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = '#15151a'; ctx.stroke();
+    ctx.font = `${Math.round(er * 1.4)}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(eb.plugin.emoji.glyph, ex, ey + 1);
+    ctx.restore();
+  }
 }
 
-// Classic comic word balloon: white ellipse, thick black outline, a triangular
-// tail aimed back at the speaker (the face), with the line inside.
+// Classic comic word balloon as ONE shape: the ellipse outline detours out to a
+// tail tip aimed at the speaker and back, so it fills and strokes as a single
+// continuous unit (no oval-plus-triangle seam).
 function drawComicBubble(ctx, x, y, r, text, faceX, faceY) {
-  const rx = r * 1.5, ry = r * 1.12;
-  // tail toward the face
+  const rx = r * 1.55, ry = r * 1.14;
   const ang = Math.atan2(faceY - y, faceX - x);
-  const tipX = x + Math.cos(ang) * (r + 46), tipY = y + Math.sin(ang) * (r + 46);
-  const bx = x + Math.cos(ang) * (rx * 0.7), by = y + Math.sin(ang) * (ry * 0.7);
-  const perp = ang + Math.PI / 2, tw = 26;
+  const gap = 0.30;                 // half-width of the tail base along the ellipse
+  const tip = r * 1.95;             // tail tip distance from bubble center
+  const tipX = x + Math.cos(ang) * tip, tipY = y + Math.sin(ang) * tip;
+
   ctx.save();
-  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#15151a'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
-  // tail (drawn first, outlined with body)
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#15151a'; ctx.lineWidth = 8; ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(bx + Math.cos(perp) * tw, by + Math.sin(perp) * tw);
+  const steps = 60, a0 = ang + gap, a1 = ang - gap + Math.PI * 2;
+  for (let i = 0; i <= steps; i++) {
+    const a = a0 + (a1 - a0) * (i / steps);
+    const px = x + rx * Math.cos(a), py = y + ry * Math.sin(a);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
   ctx.lineTo(tipX, tipY);
-  ctx.lineTo(bx - Math.cos(perp) * tw, by - Math.sin(perp) * tw);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-  // balloon
-  ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  // text (wrapped, uppercase comic)
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // text (wrapped, uppercase comic), sized to fit
   ctx.fillStyle = '#15151a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   let fs = 34; ctx.font = `900 ${fs}px system-ui, sans-serif`;
   const words = text.toUpperCase().split(/\s+/); const lines = []; let line = '';
-  const maxW = rx * 1.5;
+  const maxW = rx * 1.45;
   for (const w of words) {
     const t = line ? line + ' ' + w : w;
     if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
   }
   if (line) lines.push(line);
-  while (lines.length * fs > ry * 1.7 && fs > 18) { fs -= 2; ctx.font = `900 ${fs}px system-ui, sans-serif`; }
+  while (lines.length * (fs + 4) > ry * 1.8 && fs > 16) { fs -= 2; ctx.font = `900 ${fs}px system-ui, sans-serif`; }
   const lh = fs + 4, startY = y - (lines.length - 1) * lh / 2;
   lines.forEach((ln, i) => ctx.fillText(ln, x, startY + i * lh));
   ctx.restore();

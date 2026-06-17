@@ -563,6 +563,63 @@ function finishFunnel(bodies, y, rng) {
   return cy; // the gate (narrowest point) is the goal line
 }
 
+// One orbiting body (bubble or emoji) circling a center. Static + kinematic
+// (engine sets its position each step), so balls bounce off it as it moves.
+function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) {
+  const phase = phase0 != null ? phase0 : rng.range(0, Math.PI * 2);
+  const speed = rng.pick([-1, 1]) * rng.range(0.012, 0.019);
+  const body = Matter.Bodies.circle(cx + Math.cos(phase) * orbitR, cy + Math.sin(phase) * orbitR, bodyR,
+    { isStatic: true, label, restitution: 0.8, friction: 0.002 });
+  bodies.push(body);
+  movers.push({
+    update: (step) => {
+      const a = phase + step * speed;
+      Matter.Body.setPosition(body, { x: cx + Math.cos(a) * orbitR, y: cy + Math.sin(a) * orbitR });
+    },
+  });
+  return body;
+}
+
+// Analyst gauntlet: a dedicated, dots-free stretch where analysts stand in PAIRS
+// side by side, blocking most of the width (balls squeeze the channels between
+// and beside them). Each face carries an orbiting comic bubble and orbiting
+// emoji obstacles. Returns the new y and the face bodies.
+function analystGauntlet(bodies, movers, y, rng, aList) {
+  const faces = [];
+  if (!aList.length) return { y, faces };
+  const bandH = 760, faceR = 175;
+  for (let i = 0; i < aList.length; i += 2) {
+    const pair = aList.slice(i, i + 2);
+    const cy = y + bandH / 2;
+    const xs = pair.length === 2 ? [W * 0.29, W * 0.71] : [W * 0.5];
+    pair.forEach((a, k) => {
+      const ax = xs[k];
+      const face = peg(ax, cy, faceR, { restitution: 0.5, friction: 0.004 });
+      face.label = 'analyst';
+      face.plugin.analyst = {
+        name: a.name || '', image: a.image || null, speech: a.speech || '',
+        bubbleBody: null, emojiBodies: [],
+      };
+      bodies.push(face); faces.push(face);
+
+      if (a.speech && a.speech.trim()) {
+        const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 72, 70, 'analystbubble', rng, 0);
+        bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 72, faceR, speech: a.speech.trim() };
+        face.plugin.analyst.bubbleBody = bubble;
+      }
+      const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
+      glyphs.forEach((g, gi) => {
+        const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
+        const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 60, 38, 'analystemoji', rng, phase);
+        eb.plugin.emoji = { glyph: g };
+        face.plugin.analyst.emojiBodies.push(eb);
+      });
+    });
+    y += bandH;
+  }
+  return { y, faces };
+}
+
 // ---- Course presets -----------------------------------------------------
 // Each layout returns the final y. They compose only blocks proven not to stick
 // (dots with wall semicircles, ramps, chokes, bumpers, the tested movers).
@@ -681,6 +738,11 @@ export function buildCourse(rng, opts = {}) {
   const bodies = [], spinnerList = [], movers = [];
   let y = layout(bodies, movers, rng);
 
+  // Analyst gauntlet: dedicated paired walls right before the finish.
+  const gaunt = analystGauntlet(bodies, movers, y, rng, opts.analysts || []);
+  y = gaunt.y;
+  const analysts = gaunt.faces;
+
   // Shared hard finish for every preset: one last dense bumper scatter then a
   // narrow funnel gate. No free-fall to the line; the goal is a tight bottleneck.
   y = popBumpers(bodies, y, rng);
@@ -719,42 +781,6 @@ export function buildCourse(rng, opts = {}) {
       spinnerList.push(blade);
       eliminators.push(blade);
     }
-  }
-
-  // Analyst obstacles: a MASSIVE face the balls bounce off, with a comic speech
-  // bubble that ORBITS the face as its own moving obstacle. Spread down the lane,
-  // kept central so the orbit stays off the walls.
-  const analysts = [];
-  const aList = opts.analysts || [];
-  if (aList.length) {
-    const top = 1500, bot = finishY - 1300, span = Math.max(1, bot - top);
-    aList.forEach((a, i) => {
-      const faceR = 215, bubbleR = 76, orbitR = faceR + bubbleR + 28;
-      const ay = top + span * (i + 0.5) / aList.length + rng.range(-160, 160);
-      const margin = orbitR + bubbleR + 20;
-      const ax = rng.range(margin, W - margin);
-      const face = peg(ax, ay, faceR, { restitution: 0.5, friction: 0.004 });
-      face.label = 'analyst';
-      face.plugin.analyst = { name: a.name || '', image: a.image || null, speech: a.speech || '', bubbleBody: null };
-      bodies.push(face);
-      analysts.push(face);
-
-      if (a.speech && a.speech.trim()) {
-        const bubble = Matter.Bodies.circle(ax + orbitR, ay, bubbleR,
-          { isStatic: true, label: 'analystbubble', restitution: 0.8, friction: 0.002 });
-        const spin = rng.pick([-1, 1]) * rng.range(0.012, 0.02);
-        const phase = rng.range(0, Math.PI * 2);
-        bubble.plugin.bubble = { cx: ax, cy: ay, orbitR, faceR, speech: a.speech.trim() };
-        bodies.push(bubble);
-        face.plugin.analyst.bubbleBody = bubble;
-        movers.push({
-          update: (step) => {
-            const ang = phase + step * spin;
-            Matter.Body.setPosition(bubble, { x: ax + Math.cos(ang) * orbitR, y: ay + Math.sin(ang) * orbitR });
-          },
-        });
-      }
-    });
   }
 
   return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds, eliminators, analysts, mode };
