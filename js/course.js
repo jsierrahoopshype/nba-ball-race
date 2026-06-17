@@ -262,7 +262,7 @@ function bounceField(bodies, y, rng, rows = 3) {
   for (let row = 0; row < rows; row++) {
     const off = (row % 2 === 0) ? 0 : sx / 2;
     for (let x = x0 + off; x <= x1; x += sx) {
-      bodies.push(peg(x, y + 40 + row * sy, 42, { label: 'bouncy', restitution: 1.34 }));
+      bodies.push(peg(x, y + 40 + row * sy, 42, { label: 'bouncy', restitution: 0.9 }));
     }
   }
   return y + rows * sy + 120;
@@ -332,7 +332,7 @@ function turbine(bodies, movers, y, rng) {
 // gentle curve, so the field bunches as it funnels through but nothing wedges.
 // Placed before chaotic sections so the re-sorted pack can swap the lead.
 function chokePoint(bodies, y, rng) {
-  const R = 360, neck = 330, cy = y + R - 40;
+  const R = 360, neck = 380, cy = y + R - 40;
   const xL = (W - neck) / 2 - R;
   const xR = (W + neck) / 2 + R;
   bodies.push(peg(xL, cy, R, { restitution: 0.4, friction: 0.004 }));
@@ -342,7 +342,7 @@ function chokePoint(bodies, y, rng) {
 
 function popBumpers(bodies, y, rng) {
   const spots = [[330, 150], [540, 280], [750, 150], [430, 430], [650, 430]];
-  for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 1.45 }));
+  for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 0.95 }));
   rampLine(bodies, y, y + 600, rng);
   return y + 600;
 }
@@ -554,12 +554,12 @@ function rotatingRing(bodies, movers, y, rng) {
 // (~240px) right at the goal line. Makes the end hard, kills free-fall to the
 // line, and forces a bottleneck finish instead of a wide-open drop-in.
 function finishFunnel(bodies, y, rng) {
-  const R = 340, gate = 235;
-  const cy = y + R - 90;
+  const R = 460, gate = 300;
+  const cy = y + R - 150;
   const xL = (W - gate) / 2 - R;
   const xR = (W + gate) / 2 + R;
-  bodies.push(peg(xL, cy, R, { restitution: 0.35, friction: 0.006 }));
-  bodies.push(peg(xR, cy, R, { restitution: 0.35, friction: 0.006 }));
+  bodies.push(peg(xL, cy, R, { friction: 0.006 }));
+  bodies.push(peg(xR, cy, R, { friction: 0.006 }));
   return cy; // the gate (narrowest point) is the goal line
 }
 
@@ -610,7 +610,7 @@ function analystGauntlet(bodies, movers, y, rng, aList) {
       const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
       glyphs.forEach((g, gi) => {
         const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
-        const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 60, 38, 'analystemoji', rng, phase);
+        const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 66, 58, 'analystemoji', rng, phase);
         eb.plugin.emoji = { glyph: g };
         face.plugin.analyst.emojiBodies.push(eb);
       });
