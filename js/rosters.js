@@ -64,3 +64,36 @@ const HEADSHOT_DIR = 'players/headshots/face';
 export const HEADSHOT_URL = (filename) =>
   `https://raw.githubusercontent.com/${HEADSHOT_REPO}/${HEADSHOT_BRANCH}/${HEADSHOT_DIR}/${filename}`;
 export const TEAM_LOGO_URL = (abbr) => `https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png`;
+
+// Team colors [primary, secondary]. Colors are stable; used for ball fill + border.
+export const TEAM_COLORS = {
+  ATL:['#E03A3E','#26282A'], BOS:['#007A33','#BA9653'], BKN:['#000000','#FFFFFF'],
+  CHA:['#1D1160','#00788C'], CHI:['#CE1141','#000000'], CLE:['#860038','#FDBB30'],
+  DAL:['#00538C','#002B5E'], DEN:['#0E2240','#FEC524'], DET:['#C8102E','#1D42BA'],
+  GS:['#1D428A','#FFC72C'], HOU:['#CE1141','#000000'], IND:['#002D62','#FDBB30'],
+  LAC:['#C8102E','#1D428A'], LAL:['#552583','#FDB927'], MEM:['#5D76A9','#12173F'],
+  MIA:['#98002E','#F9A01B'], MIL:['#00471B','#EEE1C6'], MIN:['#0C2340','#236192'],
+  NO:['#0C2340','#C8102E'], NY:['#006BB6','#F58426'], OKC:['#007AC1','#EF3B24'],
+  ORL:['#0077C0','#C4CED4'], PHI:['#006BB6','#ED174C'], PHX:['#1D1160','#E56020'],
+  POR:['#E03A3E','#000000'], SAC:['#5A2D81','#63727A'], SA:['#000000','#C4CED4'],
+  TOR:['#CE1141','#000000'], UTAH:['#002B5C','#F9A01B'], WSH:['#002B5C','#E31837'],
+};
+
+// Best-effort current team per bundled player, keyed by NBA person id. Team
+// COLORS are stable but ASSIGNMENTS churn with trades, so treat these as a
+// sensible default that the color box can override per ball.
+export const PLAYER_TEAM = {
+  2544:'LAL', 201939:'GS', 201142:'PHX', 203507:'MIL', 1629029:'LAL', 203999:'DEN',
+  203954:'PHI', 1628369:'BOS', 1630162:'MIN', 1628983:'OKC', 1641705:'SA', 203081:'MIL',
+  1626164:'PHX', 202710:'GS', 202695:'LAC', 203076:'DAL', 1629630:'MEM', 1628378:'CLE',
+  1630169:'IND', 1629027:'ATL', 1629627:'NO', 202681:'DAL', 1631094:'ORL', 1626157:'NY',
+  1628389:'MIA', 1627759:'BOS', 1630163:'CHA', 1630595:'DET', 1627734:'SAC', 1627783:'IND',
+  1631096:'OKC', 1630578:'HOU', 1630532:'ORL', 1630596:'CLE', 1628973:'NY', 1628991:'MEM',
+  1628969:'NY',
+};
+
+// Returns [primary, secondary] for a player id, or null if unknown.
+export function teamColorsForPlayer(id) {
+  const t = PLAYER_TEAM[id];
+  return t && TEAM_COLORS[t] ? TEAM_COLORS[t] : null;
+}

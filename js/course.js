@@ -620,33 +620,81 @@ function analystGauntlet(bodies, movers, y, rng, aList) {
   return { y, faces };
 }
 
+// Start funnel: right below the spawn, two big bulges leave a central gate so
+// the WHOLE field is channeled through the middle together. Kills the long
+// open drop where outer balls used to free-fall and build a lead. Returns the y
+// where the real course should begin.
+function startFunnel(bodies, rng) {
+  const R = 460, gate = 235, cy = 300 + R - 150;
+  bodies.push(peg((W - gate) / 2 - R, cy, R, { friction: 0.005 }));
+  bodies.push(peg((W + gate) / 2 + R, cy, R, { friction: 0.005 }));
+  return cy + 200;
+}
+
+// Baffle comb: a full-width row of staggered horizontal bars with offset gaps,
+// so a ball can NEVER drop straight through. The single most effective
+// free-fall killer. Alternating rows offset so the gaps don't line up.
+function baffleComb(bodies, y, rng, rows = 3) {
+  const barH = 26, slotGap = 150;
+  for (let r = 0; r < rows; r++) {
+    const ry = y + 120 + r * 200;
+    const offset = (r % 2) * (slotGap); // shift every other row so gaps don't align
+    for (let x = -slotGap + offset; x < W + slotGap; x += slotGap * 2) {
+      const bx = x + slotGap / 2;
+      const len = slotGap;
+      if (bx > 40 && bx < W - 40) bodies.push(rect(bx, ry, len, barH, { restitution: 0.3, friction: 0.02 }));
+    }
+  }
+  return y + 120 + rows * 200 + 60;
+}
+
+// Spinner bar: a long bar pinned at center that rotates across the whole lane,
+// sweeping balls sideways and blocking a clean vertical drop as it turns.
+function spinnerBar(bodies, movers, y, rng) {
+  const cy = y + 260, len = 560;
+  const bar = rect(W / 2, cy, len, 34, { restitution: 0.4, friction: 0.01 });
+  bodies.push(bar);
+  const spin = rng.pick([-1, 1]) * rng.range(0.018, 0.03);
+  const phase = rng.range(0, Math.PI);
+  movers.push({ update: (step) => Matter.Body.setAngle(bar, phase + step * spin) });
+  return y + 520;
+}
+
 // ---- Course presets -----------------------------------------------------
 // Each layout returns the final y. They compose only blocks proven not to stick
 // (dots with wall semicircles, ramps, chokes, bumpers, the tested movers).
 // 'classic' is the balanced default and is left exactly as it was.
-function layoutClassic(bodies, movers, rng) {
-  let y = 360;
+function layoutClassic(bodies, movers, rng, startY = 360) {
+  let y = startY;
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 3);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
+  y = baffleComb(bodies, y, rng, 3);
   y = bigDots(bodies, y, rng, 3);
   y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
+  y = spinnerBar(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 3);
   y = pendulums(bodies, movers, y, rng, 3);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
+  y = baffleComb(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 3);
   y = ringsInField(bodies, y, rng, 2);
   y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 3);
+  y = seesaw(bodies, movers, y, rng);
+  y = chokePoint(bodies, y, rng);
+  y = popBumpers(bodies, y, rng);
+  y = baffleComb(bodies, y, rng, 3);
+  y = sliders(bodies, movers, y, rng, 3);
   return y;
 }
 
-function layoutChaos(bodies, movers, rng) {
-  let y = 360;
+function layoutChaos(bodies, movers, rng, startY = 360) {
+  let y = startY;
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 3);
   y = chokePoint(bodies, y, rng);
@@ -665,8 +713,8 @@ function layoutChaos(bodies, movers, rng) {
   return y;
 }
 
-function layoutGrind(bodies, movers, rng) {
-  let y = 360;
+function layoutGrind(bodies, movers, rng, startY = 360) {
+  let y = startY;
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
@@ -683,8 +731,8 @@ function layoutGrind(bodies, movers, rng) {
   return y;
 }
 
-function layoutPinball(bodies, movers, rng) {
-  let y = 360;
+function layoutPinball(bodies, movers, rng, startY = 360) {
+  let y = startY;
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 3);
   y = popBumpers(bodies, y, rng);
@@ -702,8 +750,8 @@ function layoutPinball(bodies, movers, rng) {
 
 // Shuffle: a seeded random ordering of self-contained feature segments, each
 // ending in a dot field so balls always re-settle into a sortable channel.
-function layoutShuffle(bodies, movers, rng) {
-  let y = 360;
+function layoutShuffle(bodies, movers, rng, startY = 360) {
+  let y = startY;
   y = archRamps(bodies, y, rng, 2);
   y = bigDots(bodies, y, rng, 3);
   const segs = [
@@ -736,7 +784,8 @@ export function buildCourse(rng, opts = {}) {
   const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
   const layout = LAYOUTS[opts.preset] || layoutClassic;
   const bodies = [], spinnerList = [], movers = [];
-  let y = layout(bodies, movers, rng);
+  const startY = startFunnel(bodies, rng);
+  let y = layout(bodies, movers, rng, startY);
 
   // Analyst gauntlet: dedicated paired walls right before the finish.
   const gaunt = analystGauntlet(bodies, movers, y, rng, opts.analysts || []);

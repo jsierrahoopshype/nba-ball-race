@@ -68,6 +68,7 @@ export function makeBalls(configs, rng) {
       label: (cfg.label || `P${i + 1}`).toUpperCase().slice(0, 5),
       name: cfg.name || (cfg.label || `P${i + 1}`),
       color: cfg.color,
+      color2: cfg.color2 || null,
       textColor: cfg.textColor || contrastText(cfg.color),
       image: cfg.image || null,    // HTMLImageElement
       imageFit: cfg.imageFit || 'cover', // 'face' for headshots, 'cover' for logos/uploads

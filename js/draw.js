@@ -21,9 +21,9 @@ export function drawImageCover(ctx, img, x, y, size) {
 export function drawFace(ctx, img, x, y, size) {
   ctx.fillStyle = '#eef0f3';
   ctx.fillRect(x, y, size, size);
-  const side = Math.min(img.width, img.height) * 0.86;
+  const side = Math.min(img.width, img.height) * 0.63;
   const sx = img.width * 0.5 - side / 2;
-  const sy = img.height * 0.42 - side / 2;
+  const sy = img.height * 0.40 - side / 2;
   ctx.drawImage(img, sx, sy, side, side, x, y, size, size);
 }
 
@@ -275,9 +275,19 @@ export function drawBall(ctx, ball) {
     ctx.fillText(p.label, x, y + 2);
   }
 
+  // Team-colored border: thick ring in the primary color, thin accent in the
+  // secondary. Falls back to white when no team colors are set.
+  const bw = Math.max(5, r * 0.13);
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.arc(x, y, r - bw / 2, 0, Math.PI * 2);
+  ctx.lineWidth = bw;
+  ctx.strokeStyle = p.color2 ? p.color : 'rgba(255,255,255,0.9)';
   ctx.stroke();
+  if (p.color2) {
+    ctx.beginPath();
+    ctx.arc(x, y, r - bw - Math.max(1.5, r * 0.02), 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(2.5, r * 0.05);
+    ctx.strokeStyle = p.color2;
+    ctx.stroke();
+  }
 }

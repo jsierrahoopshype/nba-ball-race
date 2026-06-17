@@ -12,7 +12,7 @@ import { exportHQ, webCodecsSupported } from './hqexport.js';
 import { createRecorder } from './recorder.js';
 import { createSetup } from './setup.js';
 import { loadImage } from './images.js';
-import { PLAYERS, TEAMS, HEADSHOT_URL, TEAM_LOGO_URL } from './rosters.js';
+import { PLAYERS, TEAMS, HEADSHOT_URL, TEAM_LOGO_URL, TEAM_COLORS, teamColorsForPlayer } from './rosters.js';
 
 const canvas = document.getElementById('game');
 canvas.width = CONFIG.WORLD_W;
@@ -93,12 +93,22 @@ async function applyPick(i, raw, row) {
     if (player) {
       const [short, , id, file] = player;
       const img = await loadImage(HEADSHOT_URL(file));
-      if (img) { setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); setup.setFullName(i, player[1].split(' ').slice(-1)[0]); syncRow(row, i); }
+      if (img) {
+        setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); setup.setFullName(i, player[1].split(' ').slice(-1)[0]);
+        const tc = teamColorsForPlayer(id);
+        if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
+        syncRow(row, i);
+      }
       else status(`couldn't load ${player[1]} headshot (id may need a fix)`);
     } else if (team) {
       const [abbr, name] = team;
       const img = await loadImage(TEAM_LOGO_URL(abbr));
-      if (img) { setup.setImage(i, img, `team:${abbr}`, 'cover'); setup.setName(i, abbr); syncRow(row, i); }
+      if (img) {
+        setup.setImage(i, img, `team:${abbr}`, 'cover'); setup.setName(i, abbr);
+        const tc = TEAM_COLORS[abbr];
+        if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
+        syncRow(row, i);
+      }
       else status(`couldn't load ${name} logo`);
     }
   } finally {
@@ -192,6 +202,8 @@ function autoloadFaces() {
     loadImage(HEADSHOT_URL(p[3])).then(img => {
       if (img && !setup.balls[i].image) {
         setup.setImage(i, img, `player:${p[2]}`, 'face'); setup.setFullName(i, p[1].split(' ').slice(-1)[0]); // p[1]=full name
+        const tc = teamColorsForPlayer(p[2]);
+        if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
         const row = ballRowsEl.children[i];
         if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
       }
@@ -407,7 +419,7 @@ function buildTemplate() {
     bias: biasPresetSelect ? biasPresetSelect.value : 'none',
     analysts: analysts.map(a => ({ name: a.name, source: a.source || null, speech: a.speech || '', emoji: a.emoji || '' })),
     balls: setup.balls.map(b => ({
-      label: b.label, name: b.name || '', color: b.color,
+      label: b.label, name: b.name || '', color: b.color, color2: b.color2 || null,
       source: b.source || null, imageFit: b.imageFit || 'cover', luck: b.luck || 1,
     })),
   };
@@ -445,6 +457,7 @@ function applyTemplate(t) {
     setup.setName(i, bt.label || `P${i + 1}`);
     if (bt.name) setup.setFullName(i, bt.name);
     if (bt.color) setup.setColor(i, bt.color);
+    if (bt.color2 !== undefined) setup.setColor2(i, bt.color2);
     if (bt.luck != null) setup.setLuck(i, bt.luck);
     setup.clearImage(i);
     // re-fetch image from its reference (uploads can't be restored)
