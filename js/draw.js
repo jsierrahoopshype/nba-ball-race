@@ -249,35 +249,44 @@ export function drawBall(ctx, ball) {
   const { x, y } = ball.position;
   const r = ball.circleRadius;
 
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 14;
-  ctx.shadowOffsetY = 6;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = p.color;
-  ctx.fill();
-  ctx.restore();
-
-  if (p.image) {
-    // Face/logo stays UPRIGHT regardless of ball spin (clipped to the circle).
+  if (p.image && p.imageFit === 'face') {
+    // FALLING FACE: draw the whole head (not clipped to the circle) so it's
+    // recognizable, on a neutral backing disk that hides the cutout's
+    // transparent teeth/eye holes. The head overhangs the team ring.
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.clip();
-    drawBallImage(ctx, p, x - r, y - r, r * 2);
+    ctx.shadowColor = 'rgba(0,0,0,0.32)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 7;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = '#eef0f3'; ctx.fill();
     ctx.restore();
+    const headFrac = 0.62; // head height as a fraction of the source frame
+    const scale = (2 * r * 0.99) / (p.image.height * headFrac);
+    const w = p.image.width * scale, h = p.image.height * scale;
+    ctx.drawImage(p.image, x - w / 2, y - h * 0.46, w, h);
+    drawTeamRing(ctx, p, x, y, r);
+    return;
+  }
+
+  // Logos / uploads / text: colored disk (clipped) as before.
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = p.color; ctx.fill();
+  ctx.restore();
+  if (p.image) {
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+    drawImageCover(ctx, p.image, x - r, y - r, r * 2); ctx.restore();
   } else {
     ctx.fillStyle = p.textColor;
     ctx.font = `800 ${Math.round(r * 0.66)}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(p.label, x, y + 2);
   }
+  drawTeamRing(ctx, p, x, y, r);
+}
 
-  // Team-colored border, kept THIN so the face dominates (reads as a falling
-  // face, not a tiny face in a big ball). Thin secondary accent outside it.
-  const bw = Math.max(3, r * 0.06);
+// Thin two-tone team ring (primary + secondary accent), white fallback.
+function drawTeamRing(ctx, p, x, y, r) {
+  const bw = Math.max(3, r * 0.07);
   ctx.beginPath();
   ctx.arc(x, y, r - bw / 2, 0, Math.PI * 2);
   ctx.lineWidth = bw;
@@ -285,8 +294,8 @@ export function drawBall(ctx, ball) {
   ctx.stroke();
   if (p.color2) {
     ctx.beginPath();
-    ctx.arc(x, y, r - bw - Math.max(1, r * 0.018), 0, Math.PI * 2);
-    ctx.lineWidth = Math.max(2, r * 0.035);
+    ctx.arc(x, y, r - bw - Math.max(1, r * 0.02), 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(2, r * 0.04);
     ctx.strokeStyle = p.color2;
     ctx.stroke();
   }

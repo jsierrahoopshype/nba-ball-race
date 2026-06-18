@@ -639,7 +639,7 @@ function startFunnel(bodies, rng, ballR = curBallR) {
 // (every ledge is tilted downhill toward its open end). Balls weave left-right
 // down the cascade. Ledges alternate sides so nothing piles in the middle.
 function baffleComb(bodies, y, rng, rows = 3, ballR = curBallR) {
-  const barH = 24, slope = 0.19, ledgeLen = W * 0.64;
+  const barH = 46, slope = 0.19, ledgeLen = W * 0.64;
   for (let r = 0; r < rows; r++) {
     const ry = y + 130 + r * 200;
     const left = r % 2 === 0;
@@ -654,7 +654,7 @@ function baffleComb(bodies, y, rng, rows = 3, ballR = curBallR) {
 // sweeping balls sideways and blocking a clean vertical drop as it turns.
 function spinnerBar(bodies, movers, y, rng) {
   const cy = y + 260, len = 560;
-  const bar = rect(W / 2, cy, len, 34, { restitution: 0.4, friction: 0.01 });
+  const bar = rect(W / 2, cy, len, 50, { restitution: 0.4, friction: 0.01 });
   bodies.push(bar);
   const spin = rng.pick([-1, 1]) * rng.range(0.018, 0.03);
   const phase = rng.range(0, Math.PI);

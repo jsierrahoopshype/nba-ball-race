@@ -5,7 +5,7 @@ export const CONFIG = {
   // Canvas / world
   WORLD_W: 1080,           // logical world + export width
   VIEW_H: 1920,            // logical canvas height (9:16)
-  ZOOM: 1.0,               // 1.0 = full course width always in frame (no horizontal pan)
+  ZOOM: 0.92,              // slightly wide so a bit more of the pack shows; faces stay large
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
@@ -14,7 +14,7 @@ export const CONFIG = {
   BALL_RESTITUTION: 0.38,   // lower ball-ball bounce: less "popping up" at clusters/bottlenecks
   BALL_FRICTION: 0.002,    // marble glides
   BALL_AIR_FRICTION: 0.006,   // higher drag: slower descent, longer races, no stall risk
-  MAX_SPEED: 40,           // px/step velocity cap: prevents tunneling through thin bodies
+  MAX_SPEED: 30,           // px/step velocity cap: lower = no tunneling through thin bars, tighter pack
 
   // Sticky surfaces: velocity multiplier applied every step while touching
   STICKY_DAMP_X: 0.97,
