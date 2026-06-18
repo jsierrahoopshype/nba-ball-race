@@ -7,7 +7,7 @@
 import { CONFIG } from './config.js';
 import { createRNG } from './rng.js';
 import { buildCourse } from './course.js';
-import { makeBalls } from './balls.js';
+import { makeBalls, ballRadiusForCount } from './balls.js';
 
 export function createRace(seed, ballConfigs, opts = {}) {
   const rng = createRNG(seed);
@@ -21,7 +21,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
   engine.positionIterations = 8;
   engine.velocityIterations = 6;
 
-  const course = buildCourse(rng, { mode, preset: opts.preset, analysts: opts.analysts });
+  const course = buildCourse(rng, { mode, preset: opts.preset, analysts: opts.analysts, ballR: ballRadiusForCount(ballConfigs.length) });
   const balls = makeBalls(ballConfigs, rng);
   Matter.Composite.add(engine.world, [...course.bodies, ...balls]);
 
@@ -147,21 +147,27 @@ export function createRace(seed, ballConfigs, opts = {}) {
         p.slowSteps = 0;
       }
 
-      // Silent last-resort insurance only: if a ball still gains almost nothing
-      // for 7s (a freak pocket), let it phase through obstacles for a few frames.
-      // Designed to essentially never fire now that nothing settles.
-      p.regionSteps = (p.regionSteps || 0) + 1;
-      if (p.regionMarkY === undefined) p.regionMarkY = ball.position.y;
-      if (p.regionSteps >= 420) {
-        if (ball.position.y - p.regionMarkY < 250 && p.ghostSteps === 0) {
-          p.ghostSteps = 24;
+      // Stuck rescue based on actual DESCENT (catches grinding wedges, not just
+      // fully-stopped balls). Checked every 1.5s: if a ball has dropped < 80px,
+      // first try a strong lateral kick to break a symmetric wedge; if it's
+      // still stuck 1.5s later, phase it through obstacles with a hard downward
+      // shove so it definitively clears the pocket instead of falling back in.
+      // Stuck rescue by DESCENT progress (catches grinding/pocket-bouncing, not
+      // just stopped balls). If a ball drops < 70px in ~1s it's genuinely wedged
+      // (a freely flowing ball descends far more), so phase it straight through
+      // the bottleneck with a hard downward shove. Normal bunching still drains
+      // faster than this, so it only fires on real wedges.
+      p.progWindow = (p.progWindow || 0) + 1;
+      if (p.progMarkY === undefined) p.progMarkY = p.bestY;
+      if (p.progWindow >= 60) {
+        const gained = p.bestY - p.progMarkY;
+        if (gained < 70 && p.ghostSteps === 0) {
+          p.ghostSteps = 60;
           ball.collisionFilter.mask = 0;
-          // strong downward shove WHILE ghosted so it clears the pocket and
-          // doesn't just fall back in
-          Matter.Body.setVelocity(ball, { x: rng.range(-2, 2), y: 13 });
+          Matter.Body.setVelocity(ball, { x: rng.range(-4, 4), y: 19 });
         }
-        p.regionSteps = 0;
-        p.regionMarkY = ball.position.y;
+        p.progWindow = 0;
+        p.progMarkY = p.bestY;
       }
       if (p.ghostSteps > 0) {
         p.ghostSteps--;

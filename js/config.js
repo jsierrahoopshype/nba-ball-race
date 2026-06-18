@@ -13,7 +13,7 @@ export const CONFIG = {
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.38,   // lower ball-ball bounce: less "popping up" at clusters/bottlenecks
   BALL_FRICTION: 0.002,    // marble glides
-  BALL_AIR_FRICTION: 0.0025,
+  BALL_AIR_FRICTION: 0.006,   // higher drag: slower descent, longer races, no stall risk
   MAX_SPEED: 40,           // px/step velocity cap: prevents tunneling through thin bodies
 
   // Sticky surfaces: velocity multiplier applied every step while touching

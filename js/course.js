@@ -19,6 +19,7 @@
 import { CONFIG } from './config.js';
 
 const W = CONFIG.WORLD_W;
+let curBallR = 36; // set at the start of buildCourse so gates/gaps scale with ball size
 
 function rect(x, y, w, h, opts = {}) {
   return Matter.Bodies.rectangle(x, y, w, h, {
@@ -331,8 +332,8 @@ function turbine(bodies, movers, y, rng) {
 // neck (~330px, well above bridging width), then opening back up. Big radius =
 // gentle curve, so the field bunches as it funnels through but nothing wedges.
 // Placed before chaotic sections so the re-sorted pack can swap the lead.
-function chokePoint(bodies, y, rng) {
-  const R = 360, neck = 380, cy = y + R - 40;
+function chokePoint(bodies, y, rng, ballR = curBallR) {
+  const R = 360, neck = Math.max(380, Math.round(ballR * 8)), cy = y + R - 40;
   const xL = (W - neck) / 2 - R;
   const xR = (W + neck) / 2 + R;
   bodies.push(peg(xL, cy, R, { restitution: 0.4, friction: 0.004 }));
@@ -553,8 +554,9 @@ function rotatingRing(bodies, movers, y, rng) {
 // Narrow finish: two big smooth bulges funnel the whole field into a tight gate
 // (~240px) right at the goal line. Makes the end hard, kills free-fall to the
 // line, and forces a bottleneck finish instead of a wide-open drop-in.
-function finishFunnel(bodies, y, rng) {
-  const R = 460, gate = 300;
+function finishFunnel(bodies, y, rng, ballR = curBallR) {
+  // Narrow finish, but the gate scales with ball size so big balls still pass.
+  const R = 460, gate = Math.max(235, Math.round(ballR * 5.2));
   const cy = y + R - 150;
   const xL = (W - gate) / 2 - R;
   const xR = (W + gate) / 2 + R;
@@ -624,28 +626,28 @@ function analystGauntlet(bodies, movers, y, rng, aList) {
 // the WHOLE field is channeled through the middle together. Kills the long
 // open drop where outer balls used to free-fall and build a lead. Returns the y
 // where the real course should begin.
-function startFunnel(bodies, rng) {
-  const R = 460, gate = 235, cy = 300 + R - 150;
+function startFunnel(bodies, rng, ballR = curBallR) {
+  // Gate scales with ball size so big balls (few players) never wedge.
+  const R = 460, gate = Math.max(280, Math.round(ballR * 6)), cy = 300 + R - 150;
   bodies.push(peg((W - gate) / 2 - R, cy, R, { friction: 0.005 }));
   bodies.push(peg((W + gate) / 2 + R, cy, R, { friction: 0.005 }));
   return cy + 200;
 }
 
-// Baffle comb: a full-width row of staggered horizontal bars with offset gaps,
-// so a ball can NEVER drop straight through. The single most effective
-// free-fall killer. Alternating rows offset so the gaps don't line up.
-function baffleComb(bodies, y, rng, rows = 3) {
-  const barH = 26, slotGap = 150;
+// Zigzag cascade: alternating angled ledges that overlap horizontally, so a
+// ball can never drop straight through (no free-fall) and never rest flat
+// (every ledge is tilted downhill toward its open end). Balls weave left-right
+// down the cascade. Ledges alternate sides so nothing piles in the middle.
+function baffleComb(bodies, y, rng, rows = 3, ballR = curBallR) {
+  const barH = 24, slope = 0.19, ledgeLen = W * 0.64;
   for (let r = 0; r < rows; r++) {
-    const ry = y + 120 + r * 200;
-    const offset = (r % 2) * (slotGap); // shift every other row so gaps don't align
-    for (let x = -slotGap + offset; x < W + slotGap; x += slotGap * 2) {
-      const bx = x + slotGap / 2;
-      const len = slotGap;
-      if (bx > 40 && bx < W - 40) bodies.push(rect(bx, ry, len, barH, { restitution: 0.3, friction: 0.02 }));
-    }
+    const ry = y + 130 + r * 200;
+    const left = r % 2 === 0;
+    const cx = left ? (36 + ledgeLen / 2) : (W - 36 - ledgeLen / 2);
+    const angle = left ? slope : -slope; // tilt downhill toward the open (gap) side
+    bodies.push(rect(cx, ry, ledgeLen, barH, { angle, restitution: 0.28, friction: 0.002 }));
   }
-  return y + 120 + rows * 200 + 60;
+  return y + 130 + rows * 200 + 60;
 }
 
 // Spinner bar: a long bar pinned at center that rotates across the whole lane,
@@ -782,6 +784,7 @@ const LAYOUTS = {
 
 export function buildCourse(rng, opts = {}) {
   const mode = opts.mode === 'survivor' ? 'survivor' : 'finish';
+  curBallR = opts.ballR || 36;
   const layout = LAYOUTS[opts.preset] || layoutClassic;
   const bodies = [], spinnerList = [], movers = [];
   const startY = startFunnel(bodies, rng);
