@@ -130,7 +130,7 @@ function blobChannel(bodies, y, rng, rows = 12) {
 // sit against the walls so the margins aren't a clear drop. Round + wide-spaced,
 // so balls cascade through without jamming.
 function bigDots(bodies, y, rng, rows = 4) {
-  const R = 72, sy = 210, sx = 268;
+  const R = 72, sy = 185, sx = 268;
   for (let r = 0; r < rows; r++) {
     const ry = y + 70 + r * sy;
     const off = (r % 2) ? sx / 2 : 0;
@@ -250,7 +250,7 @@ function spinnersInField(bodies, spinnerList, y, rng) {
     const a = Matter.Bodies.rectangle(p.x, p.y, len, 30);
     const b = Matter.Bodies.rectangle(p.x, p.y, len, 30, { angle: Math.PI / 2 });
     const cross = Matter.Body.create({ parts: [a, b], isStatic: true, label: 'obstacle', restitution: 0.55, friction: 0.04 });
-    cross.plugin.spinSpeed = rng.pick([-1, 1]) * rng.range(0.016, 0.024);
+    cross.plugin.spinSpeed = rng.pick([-1, 1]) * rng.range(0.009, 0.014);
     bodies.push(cross); spinnerList.push(cross);
   }
   const h = 620;
@@ -316,7 +316,7 @@ function turbine(bodies, movers, y, rng) {
   const parts = [];
   for (let k = 0; k < 4; k++) parts.push(Matter.Bodies.rectangle(cx, cy, arm, 34, { angle: k * Math.PI / 4 }));
   const rotor = Matter.Body.create({ parts, isStatic: true, label: 'obstacle', restitution: 0.6, friction: 0.03 });
-  const spd = rng.pick([-1, 1]) * rng.range(0.010, 0.016);
+  const spd = rng.pick([-1, 1]) * rng.range(0.007, 0.012);
   bodies.push(rotor);
   movers.push({ body: rotor, update(step) { Matter.Body.setAngle(rotor, step * spd); } });
   bodies.push(peg(cx, cy, 18));
@@ -426,7 +426,7 @@ function seesaw(bodies, movers, y, rng) {
   bodies.push(bar);
   bodies.push(peg(cx, cy, 22)); // visual pivot
   const amp = rng.range(0.28, 0.4);
-  const spd = rng.range(0.02, 0.03);
+  const spd = rng.range(0.011, 0.017);
   const phase = rng.range(0, Math.PI * 2);
   movers.push({
     body: bar,
@@ -461,7 +461,7 @@ function pendulums(bodies, movers, y, rng, count = 4) {
   for (let i = 0; i < count; i++) {
     const px = (count === 1) ? W / 2 : 200 + i * ((W - 400) / (count - 1));
     const amp = rng.range(0.7, 1.0);
-    const spd = rng.range(0.018, 0.028) * rng.pick([-1, 1]);
+    const spd = rng.range(0.010, 0.016) * rng.pick([-1, 1]);
     const phase = rng.range(0, Math.PI * 2);
     bodies.push(peg(px, pivotY, 16)); // visual pivot anchor
     const bar = Matter.Bodies.rectangle(px, pivotY + L / 2, barH, L, {
@@ -490,7 +490,7 @@ function sliders(bodies, movers, y, rng, count = 3) {
     const cy = y + 80 + i * sy;
     const base = (i % 2 === 0) ? W * 0.35 : W * 0.65;
     const amp = rng.range(170, 230);
-    const spd = rng.range(0.02, 0.032);
+    const spd = rng.range(0.011, 0.018);
     const phase = rng.range(0, Math.PI * 2);
     const bar = Matter.Bodies.rectangle(base, cy, barW, barH, {
       isStatic: true, label: 'obstacle', restitution: 0.45, friction: 0.02,
@@ -656,7 +656,7 @@ function spinnerBar(bodies, movers, y, rng) {
   const cy = y + 260, len = 560;
   const bar = rect(W / 2, cy, len, 50, { restitution: 0.4, friction: 0.01 });
   bodies.push(bar);
-  const spin = rng.pick([-1, 1]) * rng.range(0.018, 0.03);
+  const spin = rng.pick([-1, 1]) * rng.range(0.009, 0.015);
   const phase = rng.range(0, Math.PI);
   movers.push({ update: (step) => Matter.Body.setAngle(bar, phase + step * spin) });
   return y + 520;
@@ -669,29 +669,35 @@ function spinnerBar(bodies, movers, y, rng) {
 function layoutClassic(bodies, movers, rng, startY = 360) {
   let y = startY;
   y = archRamps(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
-  y = bigDots(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
   y = spinnerBar(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
   y = pendulums(bodies, movers, y, rng, 3);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
-  y = baffleComb(bodies, y, rng, 2);
-  y = bigDots(bodies, y, rng, 3);
+  y = baffleComb(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
   y = ringsInField(bodies, y, rng, 2);
   y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
+  y = pendulums(bodies, movers, y, rng, 3);
   y = seesaw(bodies, movers, y, rng);
   y = chokePoint(bodies, y, rng);
   y = popBumpers(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
   y = sliders(bodies, movers, y, rng, 3);
+  y = chokePoint(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
+  y = popBumpers(bodies, y, rng);
+  y = baffleComb(bodies, y, rng, 3);
   return y;
 }
 

@@ -132,16 +132,16 @@ export function createRace(seed, ballConfigs, opts = {}) {
       // comes from the course itself, choke points that bunch the field, not
       // from invisible forces.)
 
-      // Anti-settle: while nearly stationary, nudge with a downward-biased seeded
-      // impulse that RAMPS UP the longer it stays slow, so a ball that lands in a
-      // saddle pops free within ~1s instead of creeping visibly for many seconds.
+      // Anti-settle: a GENTLE nudge only when a ball is essentially stopped, so
+      // it doesn't visibly speed balls up mid-fall. Real wedges are handled by
+      // the stronger descent-based rescue below, so this can stay subtle.
       const sp = Math.hypot(ball.velocity.x, ball.velocity.y);
-      if (sp < 1.2) {
+      if (sp < 0.8) {
         p.slowSteps = (p.slowSteps || 0) + 1;
-        const ramp = Math.min(1, p.slowSteps / 36); // 0 -> 1 over ~0.6s
+        const ramp = Math.min(1, p.slowSteps / 45);
         Matter.Body.setVelocity(ball, {
-          x: ball.velocity.x + rng.range(-1.1, 1.1) * (0.5 + ramp),
-          y: ball.velocity.y + rng.range(0.4, 1.2) + ramp * 3.2,
+          x: ball.velocity.x + rng.range(-0.5, 0.5) * (0.4 + ramp * 0.6),
+          y: ball.velocity.y + rng.range(0.2, 0.6) + ramp * 1.3,
         });
       } else {
         p.slowSteps = 0;

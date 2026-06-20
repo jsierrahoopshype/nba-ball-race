@@ -3,7 +3,16 @@
 // right-edge rail where platform UI sits.
 
 import { CONFIG } from './config.js';
-import { drawBallImage } from './draw.js';
+import { drawBallImage, drawHeadshot, drawImageCover } from './draw.js';
+
+// Faces in cards/rankings render BARE (no circle); logos/text keep a colored disk.
+function cardFace(ctx, p, cx, cy, r, rankColor) {
+  if (p.image && p.imageFit === 'face') { drawHeadshot(ctx, p.image, cx, cy, r, true); return; }
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
+  if (rankColor) { ctx.lineWidth = 3; ctx.strokeStyle = rankColor; ctx.stroke(); }
+  if (p.image) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip(); drawImageCover(ctx, p.image, cx - r, cy - r, r * 2); ctx.restore(); }
+  else { ctx.fillStyle = p.textColor; ctx.font = `800 ${Math.round(r * 0.7)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.label, cx, cy + 1); }
+}
 
 const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
 
@@ -28,19 +37,7 @@ export function drawLeaderboard(ctx, standings) {
     ctx.fillText(String(i + 1), x + 16, cyc);
 
     const fx = x + 56;
-    ctx.beginPath(); ctx.arc(fx + r, cyc, r, 0, Math.PI * 2);
-    ctx.fillStyle = p.color; ctx.fill();
-    ctx.lineWidth = 3; ctx.strokeStyle = i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.85)'; ctx.stroke();
-    if (p.image) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(fx + r, cyc, r, 0, Math.PI * 2); ctx.clip();
-      drawBallImage(ctx, p, fx, cyc - r, r * 2);
-      ctx.restore();
-    } else {
-      ctx.fillStyle = p.textColor;
-      ctx.font = `800 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
-      ctx.fillText(p.label, fx + r, cyc + 1);
-    }
+    cardFace(ctx, p, fx + r, cyc, r, i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.85)');
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 38px system-ui, sans-serif';
@@ -96,21 +93,11 @@ export function drawMatchup(ctx, balls, hook, mode) {
     const p = ball.plugin.ball;
     const cx = (i % cols + 0.5) * gapX;
     const cy = top + Math.floor(i / cols) * gapY;
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = p.color; ctx.fill();
-    ctx.restore();
-    if (p.image) {
-      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-      drawBallImage(ctx, p, cx - r, cy - r, r * 2); ctx.restore();
-    } else {
-      ctx.fillStyle = p.textColor;
-      ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`;
-      ctx.fillText(p.label, cx, cy);
+    cardFace(ctx, p, cx, cy, r);
+    if (!(p.image && p.imageFit === 'face')) {
+      ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     }
-    ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     if (n <= 8) {
       ctx.fillStyle = '#15151a';
       ctx.font = '800 38px system-ui, sans-serif';
@@ -148,11 +135,7 @@ export function drawTournamentCard(ctx, info, isChampion) {
     ctx.fillText(`BEST OF ${info.format}`, W / 2, H * 0.12);
     if (p) {
       const r = 200, cx = W / 2, cy = H * 0.36;
-      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill(); ctx.restore();
-      if (p.image) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip(); drawBallImage(ctx, p, cx - r, cy - r, r * 2); ctx.restore(); }
-      else { ctx.fillStyle = p.textColor; ctx.font = `900 ${Math.round(r * 0.7)}px system-ui, sans-serif`; ctx.fillText(p.label, cx, cy); }
-      ctx.lineWidth = 10; ctx.strokeStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      cardFace(ctx, p, cx, cy, r);
       ctx.fillStyle = '#15151a'; ctx.font = '900 76px system-ui, sans-serif';
       ctx.fillText(`${(p.name || p.label).toUpperCase()}`, W / 2, H * 0.58);
       ctx.fillStyle = '#e23b3b'; ctx.font = '800 48px system-ui, sans-serif';
@@ -173,10 +156,7 @@ export function drawTournamentCard(ctx, info, isChampion) {
   scored.forEach((ball, i) => {
     const p = ball.plugin.ball, wins = info.wins[p.id] || 0;
     const cy = startY + i * rowH, lx = W * 0.5 - 300;
-    ctx.save(); ctx.beginPath(); ctx.arc(lx, cy, rr, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
-    if (p.image) { ctx.beginPath(); ctx.arc(lx, cy, rr, 0, Math.PI * 2); ctx.clip(); drawBallImage(ctx, p, lx - rr, cy - rr, rr * 2); }
-    else { ctx.fillStyle = p.textColor; ctx.font = `800 ${Math.round(rr * 0.7)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.fillText(p.label, lx, cy); }
-    ctx.restore();
+    cardFace(ctx, p, lx, cy, rr);
     ctx.fillStyle = '#15151a'; ctx.textAlign = 'left'; ctx.font = '800 40px system-ui, sans-serif';
     ctx.fillText((p.name || p.label).toUpperCase(), lx + rr + 20, cy);
     // win pips
@@ -221,24 +201,7 @@ export function drawWinner(ctx, standings, t) {
 
   // Winner portrait
   const cx = W / 2, cy = H * 0.26, r = 190 * Math.min(scale, 1.6);
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = p.color;
-  ctx.fill();
-  ctx.lineWidth = 12;
-  ctx.strokeStyle = '#ffd34d';
-  ctx.stroke();
-  if (p.image) {
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-    drawBallImage(ctx, p, cx - r, cy - r, r * 2);
-    ctx.restore();
-  } else {
-    ctx.fillStyle = p.textColor;
-    ctx.font = `900 ${Math.round(r * 0.62)}px system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.label, cx, cy);
-  }
+  cardFace(ctx, p, cx, cy, r);
 
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd34d';
@@ -265,18 +228,7 @@ export function drawWinner(ctx, standings, t) {
     ctx.fillText(`${i + 1}`, lx - rr - 28, y + 18);
 
     // ball
-    ctx.beginPath(); ctx.arc(lx, y, rr, 0, Math.PI * 2);
-    ctx.fillStyle = rb.color; ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = i < 3 ? medals[i] : 'rgba(255,255,255,0.8)'; ctx.stroke();
-    if (rb.image) {
-      ctx.save(); ctx.beginPath(); ctx.arc(lx, y, rr, 0, Math.PI * 2); ctx.clip();
-      drawBallImage(ctx, rb, lx - rr, y - rr, rr * 2); ctx.restore();
-    } else {
-      ctx.fillStyle = rb.textColor;
-      ctx.font = `800 ${Math.round(rr * 0.7)}px system-ui, sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(rb.label, lx, y + 1);
-    }
+    cardFace(ctx, rb, lx, y, rr, i < 3 ? medals[i] : 'rgba(255,255,255,0.8)');
     // name
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 52px system-ui, sans-serif';

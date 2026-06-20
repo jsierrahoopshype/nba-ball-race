@@ -7,6 +7,68 @@ const SKY_TOP = '#7dd0f7';
 const SKY_BOTTOM = '#5cb8ec';
 const OBSTACLE = '#15151a';
 
+// --- Headshots drawn BARE (no circle/ring/disk) -------------------------
+// The cutouts are transparent and the bg removal also punched out white pixels
+// (teeth, eye-whites). With no circle behind them those holes would show the
+// background through. So we fill ONLY the interior holes (transparent pixels
+// fully enclosed by the head) with a neutral tone, once per image, cached.
+const _faceCache = new WeakMap();
+function makeCanvas(w, h) {
+  if (typeof globalThis !== 'undefined' && globalThis.__mkcanvas) return globalThis.__mkcanvas(w, h);
+  if (typeof document !== 'undefined' && document.createElement) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+  }
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+  return null;
+}
+function processFace(img) {
+  if (_faceCache.has(img)) return _faceCache.get(img);
+  const w = img.width, h = img.height, cv = makeCanvas(w, h);
+  if (!cv) { _faceCache.set(img, img); return img; } // node fallback: raw image
+  const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  let id;
+  try { id = cx.getImageData(0, 0, w, h); } catch (e) { _faceCache.set(img, img); return img; }
+  const a = id.data, n = w * h, ext = new Uint8Array(n), th = 18;
+  const stack = [];
+  for (let x = 0; x < w; x++) { stack.push(x, x + (h - 1) * w); }
+  for (let y = 0; y < h; y++) { stack.push(y * w, w - 1 + y * w); }
+  while (stack.length) {
+    const i = stack.pop();
+    if (ext[i] || a[i * 4 + 3] > th) continue;
+    ext[i] = 1;
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0) stack.push(i - 1); if (x < w - 1) stack.push(i + 1);
+    if (y > 0) stack.push(i - w); if (y < h - 1) stack.push(i + w);
+  }
+  for (let i = 0; i < n; i++) {
+    if (a[i * 4 + 3] <= th && !ext[i]) { a[i * 4] = 238; a[i * 4 + 1] = 240; a[i * 4 + 2] = 243; a[i * 4 + 3] = 255; }
+  }
+  cx.putImageData(id, 0, 0);
+  _faceCache.set(img, cv);
+  return cv;
+}
+
+// Draw a headshot at its natural framing, centered on (cx,cy), sized so the
+// circle of radius r is filled by the head. No circle, ring, or disk: just the
+// head, with a soft drop shadow so it reads against any background.
+export function drawHeadshot(ctx, img, cx, cy, r, withShadow = true) {
+  const face = processFace(img);
+  // headFrac: the head occupies ~62% of the source frame height; scale so the
+  // head spans ~2r. Keeps the headshot's real proportions (no distortion).
+  const scale = (2 * r) / (img.height * 0.62);
+  const w = img.width * scale, h = img.height * scale;
+  if (withShadow) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.32)'; ctx.shadowBlur = Math.max(6, r * 0.16); ctx.shadowOffsetY = Math.max(3, r * 0.08);
+    // a tiny transparent draw to seat the shadow under the head silhouette
+    ctx.drawImage(face, cx - w / 2, cy - h * 0.46, w, h);
+    ctx.restore();
+  } else {
+    ctx.drawImage(face, cx - w / 2, cy - h * 0.46, w, h);
+  }
+}
+
 // Square center-crop of any image (logos, uploads) into a circle area.
 export function drawImageCover(ctx, img, x, y, size) {
   const s = Math.min(img.width, img.height);
@@ -140,21 +202,19 @@ function drawBackground(ctx, bg, race, cam, W, H) {
 // orbiting it (the bubble is its own moving obstacle, positioned by the engine).
 function drawAnalyst(ctx, body, a) {
   const x = body.position.x, y = body.position.y, r = body.circleRadius;
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#1b1d27'; ctx.fill();
-  ctx.restore();
   if (a.image) {
-    ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
-    drawFace(ctx, a.image, x - r, y - r, r * 2); ctx.restore();
+    drawHeadshot(ctx, a.image, x, y, r);
   } else {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#1b1d27'; ctx.fill();
+    ctx.restore();
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `900 ${Math.round(r * 0.42)}px system-ui, sans-serif`;
     ctx.fillText((a.name || '?').slice(0, 6).toUpperCase(), x, y);
+    ctx.lineWidth = 10; ctx.strokeStyle = '#ffd54a';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
   }
-  ctx.lineWidth = 10; ctx.strokeStyle = '#ffd54a';
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 
   // Orbiting comic bubble (drawn at the engine-positioned bubble body)
   const bub = a.bubbleBody;
@@ -250,23 +310,12 @@ export function drawBall(ctx, ball) {
   const r = ball.circleRadius;
 
   if (p.image && p.imageFit === 'face') {
-    // FALLING FACE: draw the whole head (not clipped to the circle) so it's
-    // recognizable, on a neutral backing disk that hides the cutout's
-    // transparent teeth/eye holes. The head overhangs the team ring.
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.32)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 7;
-    ctx.beginPath(); ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
-    ctx.fillStyle = '#eef0f3'; ctx.fill();
-    ctx.restore();
-    const headFrac = 0.62; // head height as a fraction of the source frame
-    const scale = (2 * r * 0.99) / (p.image.height * headFrac);
-    const w = p.image.width * scale, h = p.image.height * scale;
-    ctx.drawImage(p.image, x - w / 2, y - h * 0.46, w, h);
-    drawTeamRing(ctx, p, x, y, r);
+    // FALLING HEADSHOT: bare head, no circle, no ring. Natural proportions.
+    drawHeadshot(ctx, p.image, x, y, r);
     return;
   }
 
-  // Logos / uploads / text: colored disk (clipped) as before.
+  // Logos / uploads / text still use a colored disk.
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -281,22 +330,9 @@ export function drawBall(ctx, ball) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(p.label, x, y + 2);
   }
-  drawTeamRing(ctx, p, x, y, r);
-}
-
-// Thin two-tone team ring (primary + secondary accent), white fallback.
-function drawTeamRing(ctx, p, x, y, r) {
-  const bw = Math.max(3, r * 0.07);
-  ctx.beginPath();
-  ctx.arc(x, y, r - bw / 2, 0, Math.PI * 2);
-  ctx.lineWidth = bw;
-  ctx.strokeStyle = p.color2 ? p.color : 'rgba(255,255,255,0.9)';
-  ctx.stroke();
   if (p.color2) {
-    ctx.beginPath();
-    ctx.arc(x, y, r - bw - Math.max(1, r * 0.02), 0, Math.PI * 2);
-    ctx.lineWidth = Math.max(2, r * 0.04);
-    ctx.strokeStyle = p.color2;
-    ctx.stroke();
+    const bw = Math.max(3, r * 0.07);
+    ctx.beginPath(); ctx.arc(x, y, r - bw / 2, 0, Math.PI * 2);
+    ctx.lineWidth = bw; ctx.strokeStyle = p.color; ctx.stroke();
   }
 }
