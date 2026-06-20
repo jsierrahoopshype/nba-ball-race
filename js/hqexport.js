@@ -64,7 +64,7 @@ export async function exportHQ(params, onProgress = () => {}) {
   const race = createRace(params.seed, params.configs, params.opts);
   race.bg = params.opts.bg || { type: 'sky' };
   const cam = createCamera(race.course.courseLength);
-  cam.update(race.balls[0].position.x, race.balls[0].position.y, true);
+  cam.update(race.balls[0].position.x, race.balls[0].position.y, true, race.balls);
 
   // Rough total for the progress bar (race length unknown until run).
   const introF = params.showIntro ? Math.round(INTRO_S * FPS) : 0;
@@ -95,7 +95,7 @@ export async function exportHQ(params, onProgress = () => {}) {
   // 2) Countdown over the frozen start
   for (let i = 0; i < countF; i++) {
     const o = race.standings(); const a = o[0];
-    cam.update(a.position.x, a.plugin.ball.bestY, i === 0);
+    cam.update(a.position.x, a.plugin.ball.bestY, i === 0, race.balls);
     drawWorld(ctx, race, cam);
     drawLeaderboard(ctx, race.standings());
     drawCountdown(ctx, Math.max(0, 3 - Math.floor(i / (0.5 * FPS))));
@@ -110,7 +110,7 @@ export async function exportHQ(params, onProgress = () => {}) {
     race.tick(); guard++;
     const o = race.standings();
     const a = o.find((b) => !b.plugin.ball.finished && !b.plugin.ball.eliminated) || o[0];
-    cam.update(a.position.x, a.plugin.ball.bestY);
+    cam.update(a.position.x, a.plugin.ball.bestY, false, race.balls);
     drawWorld(ctx, race, cam);
     drawLeaderboard(ctx, race.standings());
     emit();
@@ -120,7 +120,7 @@ export async function exportHQ(params, onProgress = () => {}) {
   // 4) Winner reveal + hold
   for (let i = 0; i < winF; i++) {
     const o = race.standings(); const a = o[0];
-    cam.update(a.position.x, a.plugin.ball.bestY);
+    cam.update(a.position.x, a.plugin.ball.bestY, false, race.balls);
     drawWorld(ctx, race, cam);
     drawLeaderboard(ctx, race.standings());
     drawWinner(ctx, race.standings(), i / FPS);

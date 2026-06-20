@@ -18,8 +18,8 @@ export function createRace(seed, ballConfigs, opts = {}) {
     enableSleeping: false,
     gravity: { x: 0, y: CONFIG.GRAVITY_Y },
   });
-  engine.positionIterations = 8;
-  engine.velocityIterations = 6;
+  engine.positionIterations = 18;
+  engine.velocityIterations = 12;
 
   const course = buildCourse(rng, { mode, preset: opts.preset, analysts: opts.analysts, ballR: ballRadiusForCount(ballConfigs.length) });
   const balls = makeBalls(ballConfigs, rng);

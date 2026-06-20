@@ -54,18 +54,17 @@ function processFace(img) {
 // head, with a soft drop shadow so it reads against any background.
 export function drawHeadshot(ctx, img, cx, cy, r, withShadow = true) {
   const face = processFace(img);
-  // headFrac: the head occupies ~62% of the source frame height; scale so the
-  // head spans ~2r. Keeps the headshot's real proportions (no distortion).
-  const scale = (2 * r) / (img.height * 0.62);
+  // head spans ~1.75*r (a touch smaller than the ball so it doesn't dominate),
+  // natural proportions, centered slightly high so less neck/shoulder shows.
+  const scale = (1.75 * r) / (img.height * 0.62);
   const w = img.width * scale, h = img.height * scale;
   if (withShadow) {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.32)'; ctx.shadowBlur = Math.max(6, r * 0.16); ctx.shadowOffsetY = Math.max(3, r * 0.08);
-    // a tiny transparent draw to seat the shadow under the head silhouette
-    ctx.drawImage(face, cx - w / 2, cy - h * 0.46, w, h);
+    ctx.drawImage(face, cx - w / 2, cy - h * 0.44, w, h);
     ctx.restore();
   } else {
-    ctx.drawImage(face, cx - w / 2, cy - h * 0.46, w, h);
+    ctx.drawImage(face, cx - w / 2, cy - h * 0.44, w, h);
   }
 }
 
@@ -96,7 +95,7 @@ export function drawBallImage(ctx, p, x, y, size) {
 }
 
 export function drawWorld(ctx, race, cam) {
-  const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H, Z = CONFIG.ZOOM;
+  const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H, Z = cam.zoom;
   const bg = race.bg || { type: 'sky' };
 
   drawBackground(ctx, bg, race, cam, W, H);

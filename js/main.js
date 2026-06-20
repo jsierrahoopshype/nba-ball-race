@@ -240,7 +240,7 @@ function startRace(seed, record = false) {
   };
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
-  camera.update(lead.position.x, lead.position.y, true);
+  camera.update(lead.position.x, lead.position.y, true, race.balls);
   mode = (showIntroChk && !showIntroChk.checked) ? 'countdown' : 'intro';
   introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
   winnerRecorded = false; cardT = 0;
@@ -318,7 +318,7 @@ function loop(now) {
 
   const order = race.standings();
   const active = order.find(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated) || order[0];
-  camera.update(active.position.x, active.plugin.ball.bestY);
+  camera.update(active.position.x, active.plugin.ball.bestY, false, race.balls);
 
   drawWorld(ctx, race, camera);
   drawLeaderboard(ctx, race.standings());

@@ -5,7 +5,7 @@ export const CONFIG = {
   // Canvas / world
   WORLD_W: 1080,           // logical world + export width
   VIEW_H: 1920,            // logical canvas height (9:16)
-  ZOOM: 0.92,              // slightly wide so a bit more of the pack shows; faces stay large
+  ZOOM: 1.0,               // max zoom (tightest framing); the camera zooms OUT from here to fit the pack
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
