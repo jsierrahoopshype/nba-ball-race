@@ -22,14 +22,16 @@ const W = CONFIG.WORLD_W;
 let curBallR = 36; // set at the start of buildCourse so gates/gaps scale with ball size
 
 function rect(x, y, w, h, opts = {}) {
-  return Matter.Bodies.rectangle(x, y, w, h, {
-    isStatic: true, label: 'obstacle', restitution: 0.34, friction: 0.006, ...opts,
-  });
+  const b = Matter.Bodies.rectangle(x, y, w, h, { isStatic: true, label: 'obstacle', friction: 0.004, ...opts });
+  // assign restitution AFTER creation (Matter zeroes it for static bodies set
+  // via options) so balls bounce off and keep flowing instead of dead-stopping.
+  b.restitution = opts.restitution != null ? opts.restitution : 0.32;
+  return b;
 }
 function peg(x, y, r, opts = {}) {
-  return Matter.Bodies.circle(x, y, r, {
-    isStatic: true, label: 'obstacle', restitution: 0.42, friction: 0.005, ...opts,
-  });
+  const b = Matter.Bodies.circle(x, y, r, { isStatic: true, label: 'obstacle', friction: 0.004, ...opts });
+  b.restitution = opts.restitution != null ? opts.restitution : 0.36;
+  return b;
 }
 
 function gridPegs(bodies, y, h, rng, r = 32, skipFn = null) {
@@ -131,6 +133,29 @@ function blobChannel(bodies, y, rng, rows = 12) {
 // Big dots, generously spaced and staggered (reference frames 5-6). Edge dots
 // sit against the walls so the margins aren't a clear drop. Round + wide-spaced,
 // so balls cascade through without jamming.
+// Symmetric pachinko opener. Mirror-symmetric about the centre line and full
+// width, so every spawn position (left, centre, right) meets the same wall of
+// pegs and no ball gets a free side lane or a faster side. This is the first
+// thing the field hits, so the start is fair; the seeded slot shuffle in
+// makeBalls then decorrelates identity from position across seeds.
+function fairStart(bodies, y, rng) {
+  const R = 46;
+  const sx = 2 * R + Math.round(2.3 * curBallR); // ball-aware gap so balls pass
+  const sy = Math.round(2 * R + 1.4 * curBallR);
+  const rows = 4;
+  const half = Math.ceil((W / 2) / sx) + 1;
+  for (let r = 0; r < rows; r++) {
+    const ry = y + 90 + r * sy;
+    const centred = (r % 2 === 0); // peg ON centre / gap ON centre, alternating
+    for (let k = -half; k <= half; k++) {
+      const x = W / 2 + (centred ? k * sx : (k + 0.5) * sx);
+      if (x < 70 || x > W - 70) continue;
+      bodies.push(peg(x, ry, R, { restitution: 0.42 }));
+    }
+  }
+  return y + 90 + rows * sy + 90;
+}
+
 function bigDots(bodies, y, rng, rows = 4) {
   const R = 72;
   // Spacing scales with ball size: horizontal gap is always ~1.35x the ball
@@ -633,7 +658,7 @@ function analystGauntlet(bodies, movers, y, rng, aList) {
 // where the real course should begin.
 function startFunnel(bodies, rng, ballR = curBallR) {
   // Gate scales with ball size so big balls (few players) never wedge.
-  const R = 460, gate = Math.max(280, Math.round(ballR * 6)), cy = 300 + R - 150;
+  const R = 460, gate = Math.max(440, Math.round(ballR * 8)), cy = 300 + R - 150;
   bodies.push(peg((W - gate) / 2 - R, cy, R, { friction: 0.005 }));
   bodies.push(peg((W + gate) / 2 + R, cy, R, { friction: 0.005 }));
   return cy + 200;
@@ -644,13 +669,13 @@ function startFunnel(bodies, rng, ballR = curBallR) {
 // (every ledge is tilted downhill toward its open end). Balls weave left-right
 // down the cascade. Ledges alternate sides so nothing piles in the middle.
 function baffleComb(bodies, y, rng, rows = 3, ballR = curBallR) {
-  const barH = 64, slope = 0.16, ledgeLen = W * 0.64;
+  const barH = 58, slope = 0.52, ledgeLen = W * 0.5;
   for (let r = 0; r < rows; r++) {
     const ry = y + 130 + r * 200;
     const left = r % 2 === 0;
     const cx = left ? (36 + ledgeLen / 2) : (W - 36 - ledgeLen / 2);
     const angle = left ? slope : -slope; // tilt downhill toward the open (gap) side
-    bodies.push(rect(cx, ry, ledgeLen, barH, { angle, restitution: 0.28, friction: 0.002 }));
+    bodies.push(rect(cx, ry, ledgeLen, barH, { angle, restitution: 0.45, friction: 0.0005 }));
   }
   return y + 130 + rows * 200 + 60;
 }
@@ -673,36 +698,30 @@ function spinnerBar(bodies, movers, y, rng) {
 // 'classic' is the balanced default and is left exactly as it was.
 function layoutClassic(bodies, movers, rng, startY = 360) {
   let y = startY;
-  y = archRamps(bodies, y, rng, 2);
+  y = fairStart(bodies, y, rng);
   y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
-  y = popBumpers(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
-  y = chokePoint(bodies, y, rng);
   y = turbine(bodies, movers, y, rng);
-  y = spinnerBar(bodies, movers, y, rng);
+  y = chokePoint(bodies, y, rng);
   y = bigDots(bodies, y, rng, 4);
   y = pendulums(bodies, movers, y, rng, 3);
-  y = chokePoint(bodies, y, rng);
-  y = popBumpers(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
-  y = ringsInField(bodies, y, rng, 2);
+  y = spinnerBar(bodies, movers, y, rng);
   y = chokePoint(bodies, y, rng);
-  y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 4);
   y = pendulums(bodies, movers, y, rng, 3);
   y = seesaw(bodies, movers, y, rng);
-  y = chokePoint(bodies, y, rng);
-  y = popBumpers(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
+  y = chokePoint(bodies, y, rng);
+  y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 4);
   y = sliders(bodies, movers, y, rng, 3);
-  y = chokePoint(bodies, y, rng);
-  y = bigDots(bodies, y, rng, 4);
-  y = popBumpers(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
+  y = bigDots(bodies, y, rng, 4);
   return y;
 }
 

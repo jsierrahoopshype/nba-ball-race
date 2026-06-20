@@ -147,31 +147,29 @@ export function createRace(seed, ballConfigs, opts = {}) {
         p.slowSteps = 0;
       }
 
-      // Stuck rescue based on actual DESCENT (catches grinding wedges, not just
-      // fully-stopped balls). Checked every 1.5s: if a ball has dropped < 80px,
-      // first try a strong lateral kick to break a symmetric wedge; if it's
-      // still stuck 1.5s later, phase it through obstacles with a hard downward
-      // shove so it definitively clears the pocket instead of falling back in.
-      // Stuck rescue by DESCENT progress (catches grinding/pocket-bouncing, not
-      // just stopped balls). If a ball drops < 70px in ~1s it's genuinely wedged
-      // (a freely flowing ball descends far more), so phase it straight through
-      // the bottleneck with a hard downward shove. Normal bunching still drains
-      // faster than this, so it only fires on real wedges.
+      // Stuck rescue by DESCENT progress, but collisions ALWAYS stay on so the
+      // ball never passes through an obstacle. If a ball drops < 70px in ~1s it
+      // gets a sideways shove (alternating direction, ramping if it persists) so
+      // it rolls off whatever it's resting on. Obstacles always matter.
       p.progWindow = (p.progWindow || 0) + 1;
       if (p.progMarkY === undefined) p.progMarkY = p.bestY;
       if (p.progWindow >= 60) {
         const gained = p.bestY - p.progMarkY;
-        if (gained < 70 && p.ghostSteps === 0) {
-          p.ghostSteps = 60;
-          ball.collisionFilter.mask = 0;
-          Matter.Body.setVelocity(ball, { x: rng.range(-4, 4), y: 19 });
+        if (gained < 70) {
+          p.rescueCount = (p.rescueCount || 0) + 1;
+          const dir = (p.rescueCount % 2 === 0) ? 1 : -1;
+          const mag = 6 + p.rescueCount * 2;
+          // if it stays stuck across several tries, pop it up-and-over so it
+          // lifts out of a pocket and re-drops (collisions stay on throughout).
+          Matter.Body.setVelocity(ball, {
+            x: dir * mag,
+            y: p.rescueCount > 3 ? -7 : Math.max(ball.velocity.y, 4),
+          });
+        } else {
+          p.rescueCount = 0;
         }
         p.progWindow = 0;
         p.progMarkY = p.bestY;
-      }
-      if (p.ghostSteps > 0) {
-        p.ghostSteps--;
-        if (p.ghostSteps === 0) ball.collisionFilter.mask = 0xFFFFFFFF;
       }
 
       // Finish line
