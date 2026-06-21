@@ -25,17 +25,20 @@ function rect(x, y, w, h, opts = {}) {
   const b = Matter.Bodies.rectangle(x, y, w, h, { isStatic: true, label: 'obstacle', friction: 0.004, ...opts });
   // assign restitution AFTER creation (Matter zeroes it for static bodies set
   // via options) so balls bounce off and keep flowing instead of dead-stopping.
-  b.restitution = opts.restitution != null ? opts.restitution : 0.32;
+  b.restitution = opts.restitution != null ? opts.restitution : 0.46;
   return b;
 }
 function peg(x, y, r, opts = {}) {
   const b = Matter.Bodies.circle(x, y, r, { isStatic: true, label: 'obstacle', friction: 0.004, ...opts });
-  b.restitution = opts.restitution != null ? opts.restitution : 0.36;
+  b.restitution = opts.restitution != null ? opts.restitution : 0.5;
   return b;
 }
 
 function gridPegs(bodies, y, h, rng, r = 32, skipFn = null) {
-  const sx = 2 * r + Math.round(2.3 * curBallR), sy = 150, x0 = 140, x1 = W - 140;
+  const sx = 2 * r + Math.round(2.9 * curBallR), sy = Math.round(2 * r + 1.7 * curBallR);
+  // first peg sits far enough from the wall that the channel between them is
+  // always wider than a ball (peg radius + ~1.5x ball diameter).
+  const x0 = r + Math.round(3 * curBallR), x1 = W - r - Math.round(3 * curBallR);
   let row = 0;
   for (let py = y + 40; py < y + h - 20; py += sy, row++) {
     const off = (row % 2 === 0) ? 0 : sx / 2;
@@ -67,8 +70,8 @@ function edgePosts(bodies, yTop, yBot, rng) {
 // + wide-spaced (gap ~119px > ball) so balls pass through, nothing wedges.
 function scatterDots(bodies, y, h, rng, skip) {
   const R = 58, x0 = 92, x1 = W - 92;
-  const sx = 2 * R + Math.round(2.7 * curBallR);
-  const sy = Math.round(2 * R + 1.5 * curBallR);
+  const sx = 2 * R + Math.round(2.9 * curBallR);
+  const sy = Math.round(2 * R + 1.6 * curBallR);
   let row = 0;
   for (let yy = y + 70; yy < y + h - 40; yy += sy, row++) {
     const off = (row % 2) ? sx / 2 : 0;
@@ -84,14 +87,15 @@ function scatterDots(bodies, y, h, rng, skip) {
 // instead of free-falling or wedging. Alternating sides down the block. Used in
 // OPEN blocks whose central feature is kept clear of the margin.
 function rampLine(bodies, yTop, yBot, rng) {
-  const len = 160, tilt = 0.34, sp = 330;
-  let i = Math.floor(yTop / sp); // phase by absolute y so adjacent blocks alternate
-  for (let yy = yTop + 40; yy < yBot - 20; yy += sp, i++) {
+  // Round bumps half-embedded in the wall, alternating sides. They nudge balls
+  // back toward centre but, being round and flush to the wall, present no corner
+  // or ledge a ball can wedge or rest on. Pure deflection, no trap.
+  const R = 96, sp = 300;
+  let i = Math.floor(yTop / sp);
+  for (let yy = yTop + 60; yy < yBot - 20; yy += sp, i++) {
     const left = i % 2 === 0;
-    const cxo = Math.cos(tilt) * len / 2, cyo = Math.sin(tilt) * len / 2;
-    const x = left ? cxo : W - cxo;
-    bodies.push(Matter.Bodies.rectangle(x, yy + cyo, len, 26,
-      { isStatic: true, angle: left ? tilt : -tilt, label: 'obstacle', restitution: 0.35, friction: 0.004 }));
+    const x = left ? -R * 0.35 : W + R * 0.35; // mostly inside the wall, bulges ~62px in
+    bodies.push(peg(x, yy, R, { restitution: 0.3 }));
   }
 }
 
@@ -139,39 +143,41 @@ function blobChannel(bodies, y, rng, rows = 12) {
 // thing the field hits, so the start is fair; the seeded slot shuffle in
 // makeBalls then decorrelates identity from position across seeds.
 function fairStart(bodies, y, rng) {
-  const R = 46;
-  const sx = 2 * R + Math.round(2.3 * curBallR); // ball-aware gap so balls pass
-  const sy = Math.round(2 * R + 1.4 * curBallR);
-  const rows = 4;
+  // A big round splitter dead-centre, right under the spawn: the cluster hits it
+  // and rolls off to both sides (symmetric, so fair; round, so nothing settles).
+  // Then two symmetric rows of round pegs mix the field. Gaps are ball-aware.
+  bodies.push(peg(W / 2, y + 150, 150, { restitution: 0.5 }));
+  const R = 58;
+  const sx = 2 * R + Math.round(2.9 * curBallR);
+  const sy = Math.round(2 * R + 1.7 * curBallR);
   const half = Math.ceil((W / 2) / sx) + 1;
-  for (let r = 0; r < rows; r++) {
-    const ry = y + 90 + r * sy;
-    const centred = (r % 2 === 0); // peg ON centre / gap ON centre, alternating
+  for (let r = 0; r < 2; r++) {
+    const ry = y + 150 + 230 + r * sy;
+    const centred = (r % 2 === 1);
     for (let k = -half; k <= half; k++) {
       const x = W / 2 + (centred ? k * sx : (k + 0.5) * sx);
-      if (x < 70 || x > W - 70) continue;
-      bodies.push(peg(x, ry, R, { restitution: 0.42 }));
+      if (x < 80 || x > W - 80) continue;
+      bodies.push(peg(x, ry, R, { restitution: 0.5 }));
     }
   }
-  return y + 90 + rows * sy + 90;
+  return y + 150 + 230 + 2 * sy + 90;
 }
 
 function bigDots(bodies, y, rng, rows = 4) {
-  const R = 72;
-  // Spacing scales with ball size: horizontal gap is always ~1.35x the ball
-  // diameter so a ball falls cleanly through instead of wedging in the throat,
-  // and rows are far enough apart that no pocket smaller than a ball can form.
-  const sx = 2 * R + Math.round(2.7 * curBallR);
-  const sy = Math.round(2 * R + 1.5 * curBallR);
-  const edge = 200 + R; // keep interior dots clear of the wall semicircles
+  const R = 72, semiR = 84;
+  const sx = 2 * R + Math.round(2.9 * curBallR);
+  const sy = Math.round(2 * R + 1.6 * curBallR);
+  // first interior dot sits far enough from the wall bump that the channel
+  // between them is always wider than a ball (semi bulge + dot radius + gap).
+  const edge = semiR + R + Math.round(2.9 * curBallR);
   for (let r = 0; r < rows; r++) {
     const ry = y + 70 + r * sy;
     const off = (r % 2) ? sx / 2 : 0;
     for (let x = edge + off; x <= W - edge; x += sx) {
-      bodies.push(peg(x + rng.range(-6, 6), ry, R, { restitution: 0.5 }));
+      bodies.push(peg(x + rng.range(-8, 8), ry, R, { restitution: 0.5 }));
     }
-    const L = wallSemi('L', ry, 96); if (L) bodies.push(L);
-    const Rr = wallSemi('R', ry, 96); if (Rr) bodies.push(Rr);
+    const L = wallSemi('L', ry, semiR); if (L) bodies.push(L);
+    const Rr = wallSemi('R', ry, semiR); if (Rr) bodies.push(Rr);
   }
   return y + rows * sy + 120;
 }
@@ -454,9 +460,9 @@ function seesaw(bodies, movers, y, rng) {
     isStatic: true, label: 'obstacle', restitution: 0.35, friction: 0.04,
   });
   bodies.push(bar);
-  bodies.push(peg(cx, cy, 22)); // visual pivot
-  const amp = rng.range(0.28, 0.4);
-  const spd = rng.range(0.011, 0.017);
+  bodies.push(peg(cx, cy, 40)); // hub: keeps balls off the dead-centre pivot
+  const amp = rng.range(0.42, 0.55);
+  const spd = rng.range(0.016, 0.024);
   const phase = rng.range(0, Math.PI * 2);
   movers.push({
     body: bar,
@@ -673,8 +679,10 @@ function baffleComb(bodies, y, rng, rows = 3, ballR = curBallR) {
   for (let r = 0; r < rows; r++) {
     const ry = y + 130 + r * 200;
     const left = r % 2 === 0;
-    const cx = left ? (36 + ledgeLen / 2) : (W - 36 - ledgeLen / 2);
-    const angle = left ? slope : -slope; // tilt downhill toward the open (gap) side
+    // overlap the wall by 60px so there's NO gap between wall and ledge end for
+    // a ball to wedge into; the ledge tilts downhill toward the open centre.
+    const cx = left ? (ledgeLen / 2 - 60) : (W - ledgeLen / 2 + 60);
+    const angle = left ? slope : -slope;
     bodies.push(rect(cx, ry, ledgeLen, barH, { angle, restitution: 0.45, friction: 0.0005 }));
   }
   return y + 130 + rows * 200 + 60;
@@ -686,7 +694,7 @@ function spinnerBar(bodies, movers, y, rng) {
   const cy = y + 260, len = 560;
   const bar = rect(W / 2, cy, len, 50, { restitution: 0.4, friction: 0.01 });
   bodies.push(bar);
-  const spin = rng.pick([-1, 1]) * rng.range(0.009, 0.015);
+  const spin = rng.pick([-1, 1]) * rng.range(0.013, 0.02);
   const phase = rng.range(0, Math.PI);
   movers.push({ update: (step) => Matter.Body.setAngle(bar, phase + step * spin) });
   return y + 520;

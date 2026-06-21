@@ -9,12 +9,12 @@ export const CONFIG = {
   STEP_MS: 1000 / 60,      // fixed physics timestep. Do not change: replays depend on it.
 
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
-  GRAVITY_Y: 0.85,
+  GRAVITY_Y: 1.05,
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.38,   // lower ball-ball bounce: less "popping up" at clusters/bottlenecks
   BALL_FRICTION: 0.001,    // marble glides
   BALL_AIR_FRICTION: 0.0022,  // light drag: balls keep falling naturally instead of stalling
-  MAX_SPEED: 30,           // px/step velocity cap: lower = no tunneling through thin bars, tighter pack
+  MAX_SPEED: 34,           // px/step velocity cap: lower = no tunneling through thin bars, tighter pack
 
   // Sticky surfaces: velocity multiplier applied every step while touching
   STICKY_DAMP_X: 0.97,

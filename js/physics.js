@@ -128,49 +128,10 @@ export function createRace(seed, ballConfigs, opts = {}) {
       // Progress tracking (for camera + standings ordering)
       if (ball.position.y > p.bestY) p.bestY = ball.position.y;
 
-      // (No catch-up surge or rubber-band: laggards are never sped up. Balance
-      // comes from the course itself, choke points that bunch the field, not
-      // from invisible forces.)
-
-      // Anti-settle: a GENTLE nudge only when a ball is essentially stopped, so
-      // it doesn't visibly speed balls up mid-fall. Real wedges are handled by
-      // the stronger descent-based rescue below, so this can stay subtle.
-      const sp = Math.hypot(ball.velocity.x, ball.velocity.y);
-      if (sp < 0.8) {
-        p.slowSteps = (p.slowSteps || 0) + 1;
-        const ramp = Math.min(1, p.slowSteps / 45);
-        Matter.Body.setVelocity(ball, {
-          x: ball.velocity.x + rng.range(-0.5, 0.5) * (0.4 + ramp * 0.6),
-          y: ball.velocity.y + rng.range(0.2, 0.6) + ramp * 1.3,
-        });
-      } else {
-        p.slowSteps = 0;
-      }
-
-      // Stuck rescue by DESCENT progress, but collisions ALWAYS stay on so the
-      // ball never passes through an obstacle. If a ball drops < 70px in ~1s it
-      // gets a sideways shove (alternating direction, ramping if it persists) so
-      // it rolls off whatever it's resting on. Obstacles always matter.
-      p.progWindow = (p.progWindow || 0) + 1;
-      if (p.progMarkY === undefined) p.progMarkY = p.bestY;
-      if (p.progWindow >= 60) {
-        const gained = p.bestY - p.progMarkY;
-        if (gained < 70) {
-          p.rescueCount = (p.rescueCount || 0) + 1;
-          const dir = (p.rescueCount % 2 === 0) ? 1 : -1;
-          const mag = 6 + p.rescueCount * 2;
-          // if it stays stuck across several tries, pop it up-and-over so it
-          // lifts out of a pocket and re-drops (collisions stay on throughout).
-          Matter.Body.setVelocity(ball, {
-            x: dir * mag,
-            y: p.rescueCount > 3 ? -7 : Math.max(ball.velocity.y, 4),
-          });
-        } else {
-          p.rescueCount = 0;
-        }
-        p.progWindow = 0;
-        p.progMarkY = p.bestY;
-      }
+      // Pure gravity and collisions: no drift, nudge, rescue, anti-settle, or
+      // catch-up. The course geometry alone keeps balls moving (round
+      // deflectors, steep shed surfaces, wall-flush bars, gaps always wider than
+      // a ball). A stall would be a layout bug to fix in the course, not here.
 
       // Finish line
       if (ball.position.y >= course.finishY) placeFinish(ball);

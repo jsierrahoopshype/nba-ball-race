@@ -49,6 +49,27 @@ function processFace(img) {
   return cv;
 }
 
+// Draw the FULL head INSIDE a circular ball: a colored disk, the whole head
+// scaled to fit within the circle (not cropped tight) and clipped to it, plus a
+// thin ring. This is the "face inside the ball" look.
+export function drawFaceInCircle(ctx, img, cx, cy, r, color, color2, ringColor) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = Math.max(8, r * 0.22); ctx.shadowOffsetY = Math.max(3, r * 0.1);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = color || '#222'; ctx.fill();
+  ctx.restore();
+  const face = processFace(img);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
+  // head ~62% of the source height; scale so the whole head fits inside ~1.72r
+  const scale = (1.72 * r) / (img.height * 0.62);
+  const w = img.width * scale, h = img.height * scale;
+  ctx.drawImage(face, cx - w / 2, cy - h * 0.4, w, h);
+  ctx.restore();
+  const bw = Math.max(3, r * 0.08);
+  ctx.beginPath(); ctx.arc(cx, cy, r - bw / 2, 0, Math.PI * 2);
+  ctx.lineWidth = bw; ctx.strokeStyle = ringColor || color2 || 'rgba(255,255,255,0.92)'; ctx.stroke();
+}
+
 // Draw a headshot at its natural framing, centered on (cx,cy), sized so the
 // circle of radius r is filled by the head. No circle, ring, or disk: just the
 // head, with a soft drop shadow so it reads against any background.
@@ -202,7 +223,7 @@ function drawBackground(ctx, bg, race, cam, W, H) {
 function drawAnalyst(ctx, body, a) {
   const x = body.position.x, y = body.position.y, r = body.circleRadius;
   if (a.image) {
-    drawHeadshot(ctx, a.image, x, y, r);
+    drawFaceInCircle(ctx, a.image, x, y, r, '#1b1d27', null, '#ffd54a');
   } else {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
@@ -309,8 +330,7 @@ export function drawBall(ctx, ball) {
   const r = ball.circleRadius;
 
   if (p.image && p.imageFit === 'face') {
-    // FALLING HEADSHOT: bare head, no circle, no ring. Natural proportions.
-    drawHeadshot(ctx, p.image, x, y, r);
+    drawFaceInCircle(ctx, p.image, x, y, r, p.color, p.color2);
     return;
   }
 

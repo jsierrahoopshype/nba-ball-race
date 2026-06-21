@@ -3,11 +3,12 @@
 // right-edge rail where platform UI sits.
 
 import { CONFIG } from './config.js';
-import { drawBallImage, drawHeadshot, drawImageCover } from './draw.js';
+import { drawBallImage, drawFaceInCircle, drawImageCover } from './draw.js';
 
-// Faces in cards/rankings render BARE (no circle); logos/text keep a colored disk.
+// Faces in cards/rankings: the full head inside a colored disk (matches the
+// race balls). Logos/text keep a colored disk.
 function cardFace(ctx, p, cx, cy, r, rankColor) {
-  if (p.image && p.imageFit === 'face') { drawHeadshot(ctx, p.image, cx, cy, r, true); return; }
+  if (p.image && p.imageFit === 'face') { drawFaceInCircle(ctx, p.image, cx, cy, r, p.color, p.color2, rankColor); return; }
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
   if (rankColor) { ctx.lineWidth = 3; ctx.strokeStyle = rankColor; ctx.stroke(); }
   if (p.image) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip(); drawImageCover(ctx, p.image, cx - r, cy - r, r * 2); ctx.restore(); }
