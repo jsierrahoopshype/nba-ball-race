@@ -623,22 +623,24 @@ function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) 
 // evenly spaced depths (not lumped in one band). Each is a round face the balls
 // bounce off, carrying its orbiting speech bubble and emoji. Placed within the
 // existing course depth so it doesn't add length.
-function placeAnalystsSpread(bodies, movers, aList, y0, y1, rng) {
+function placeAnalystsSpread(bodies, movers, spinners, aList, y0, y1, rng) {
   const faces = [];
   if (!aList.length) return faces;
-  const faceR = 110;
+  const faceR = 168; // bigger
+  const bandHalf = faceR + 230; // tall clear band so the analyst stands alone
+  const protectedSet = new Set([...(movers || []), ...(spinners || [])]);
   const step = (y1 - y0) / aList.length;
   aList.forEach((a, i) => {
-    const cy = y0 + step * (i + 0.5) + rng.range(-step * 0.18, step * 0.18);
+    const cy = y0 + step * (i + 0.5);
     const left = i % 2 === 0;
-    const ax = left ? W * 0.24 : W * 0.76; // ball-aware clear of the wall
-    // clear a dots-free bubble around the analyst so the round face is a lone
-    // deflector (no face-plus-dot pockets a ball could wedge in)
-    const clearR = faceR + 2.4 * curBallR + 30;
+    const ax = left ? W * 0.4 : W * 0.6;
+    // isolate: clear other static obstacles in a full-width band around it, but
+    // never remove a moving part (would desync the mover/spinner update).
     for (let k = bodies.length - 1; k >= 0; k--) {
       const bd = bodies[k];
-      if (bd.circleRadius && bd.circleRadius <= 80 &&
-          Math.hypot(bd.position.x - ax, bd.position.y - cy) < clearR) bodies.splice(k, 1);
+      if (protectedSet.has(bd)) continue;
+      if ((bd.label === 'obstacle' || bd.label === 'bouncy') &&
+          bd.position.y > cy - bandHalf && bd.position.y < cy + bandHalf) bodies.splice(k, 1);
     }
     const face = peg(ax, cy, faceR, { restitution: 0.5, friction: 0.004 });
     face.label = 'analyst';
@@ -648,14 +650,14 @@ function placeAnalystsSpread(bodies, movers, aList, y0, y1, rng) {
     };
     bodies.push(face); faces.push(face);
     if (a.speech && a.speech.trim()) {
-      const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 60, 60, 'analystbubble', rng, 0);
-      bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 60, faceR, speech: a.speech.trim() };
+      const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 74, 72, 'analystbubble', rng, 0);
+      bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 74, faceR, speech: a.speech.trim() };
       face.plugin.analyst.bubbleBody = bubble;
     }
     const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
     glyphs.forEach((g, gi) => {
       const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
-      const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 56, 50, 'analystemoji', rng, phase);
+      const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 66, 56, 'analystemoji', rng, phase);
       eb.plugin.emoji = { glyph: g };
       face.plugin.analyst.emojiBodies.push(eb);
     });
@@ -874,8 +876,14 @@ export function buildCourse(rng, opts = {}) {
   const startY = startFunnel(bodies, rng);
   let y = layout(bodies, movers, rng, startY);
 
-  // Analysts spread across the whole race (not lumped before the finish).
-  const analysts = placeAnalystsSpread(bodies, movers, opts.analysts || [], startY + 1600, y - 900, rng);
+  // Analysts spread across the whole race (not lumped before the finish),
+  // bigger and isolated in their own clear bands.
+  const analysts = placeAnalystsSpread(bodies, movers, spinnerList, opts.analysts || [], startY + 1600, y - 900, rng);
+
+  // Dense, dramatic run-in to the finish: a packed scatter then a dot field so
+  // the field bunches up and the winner isn't settled until the last moment.
+  scatterDots(bodies, y, 1300, rng, null); y += 1300;
+  y = bigDots(bodies, y, rng, 4);
 
   // Shared hard finish for every preset: one last dense bumper scatter then a
   // narrow funnel gate. No free-fall to the line; the goal is a tight bottleneck.
