@@ -226,8 +226,11 @@ export function drawWinner(ctx, standings, t) {
 
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd34d';
-  ctx.font = '900 84px system-ui, sans-serif';
-  ctx.fillText(`${(p.name || p.label).toUpperCase()} WINS`, cx, H * 0.41);
+  const wtext = `${(p.name || p.label).toUpperCase()} WINS`;
+  let wfs = 84;
+  ctx.font = `900 ${wfs}px system-ui, sans-serif`;
+  while (ctx.measureText(wtext).width > W - 70 && wfs > 34) { wfs -= 4; ctx.font = `900 ${wfs}px system-ui, sans-serif`; }
+  ctx.fillText(wtext, cx, H * 0.41);
 
   // Standings list, staggered reveal (each row fades in slightly after the prior)
   const rows = standings.slice(0, Math.min(8, standings.length));

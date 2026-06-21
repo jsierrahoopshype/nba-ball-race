@@ -69,7 +69,8 @@ function edgePosts(bodies, yTop, yBot, rng) {
 // edge, while the skip-zone keeps dots off the feature so no pocket forms. Round
 // + wide-spaced (gap ~119px > ball) so balls pass through, nothing wedges.
 function scatterDots(bodies, y, h, rng, skip) {
-  const R = 58, x0 = 92, x1 = W - 92;
+  const R = 58;
+  const x0 = R + Math.round(2.9 * curBallR), x1 = W - R - Math.round(2.9 * curBallR);
   const sx = 2 * R + Math.round(2.9 * curBallR);
   const sy = Math.round(2 * R + 1.6 * curBallR);
   let row = 0;
@@ -618,6 +619,50 @@ function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) 
   return body;
 }
 
+// Spread analysts across the whole race, one at a time, alternating sides, at
+// evenly spaced depths (not lumped in one band). Each is a round face the balls
+// bounce off, carrying its orbiting speech bubble and emoji. Placed within the
+// existing course depth so it doesn't add length.
+function placeAnalystsSpread(bodies, movers, aList, y0, y1, rng) {
+  const faces = [];
+  if (!aList.length) return faces;
+  const faceR = 110;
+  const step = (y1 - y0) / aList.length;
+  aList.forEach((a, i) => {
+    const cy = y0 + step * (i + 0.5) + rng.range(-step * 0.18, step * 0.18);
+    const left = i % 2 === 0;
+    const ax = left ? W * 0.24 : W * 0.76; // ball-aware clear of the wall
+    // clear a dots-free bubble around the analyst so the round face is a lone
+    // deflector (no face-plus-dot pockets a ball could wedge in)
+    const clearR = faceR + 2.4 * curBallR + 30;
+    for (let k = bodies.length - 1; k >= 0; k--) {
+      const bd = bodies[k];
+      if (bd.circleRadius && bd.circleRadius <= 80 &&
+          Math.hypot(bd.position.x - ax, bd.position.y - cy) < clearR) bodies.splice(k, 1);
+    }
+    const face = peg(ax, cy, faceR, { restitution: 0.5, friction: 0.004 });
+    face.label = 'analyst';
+    face.plugin.analyst = {
+      name: a.name || '', image: a.image || null, speech: a.speech || '',
+      bubbleBody: null, emojiBodies: [],
+    };
+    bodies.push(face); faces.push(face);
+    if (a.speech && a.speech.trim()) {
+      const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 60, 60, 'analystbubble', rng, 0);
+      bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 60, faceR, speech: a.speech.trim() };
+      face.plugin.analyst.bubbleBody = bubble;
+    }
+    const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
+    glyphs.forEach((g, gi) => {
+      const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
+      const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 56, 50, 'analystemoji', rng, phase);
+      eb.plugin.emoji = { glyph: g };
+      face.plugin.analyst.emojiBodies.push(eb);
+    });
+  });
+  return faces;
+}
+
 // Analyst gauntlet: a dedicated, dots-free stretch where analysts stand in PAIRS
 // side by side, blocking most of the width (balls squeeze the channels between
 // and beside them). Each face carries an orbiting comic bubble and orbiting
@@ -707,6 +752,7 @@ function spinnerBar(bodies, movers, y, rng) {
 function layoutClassic(bodies, movers, rng, startY = 360) {
   let y = startY;
   y = fairStart(bodies, y, rng);
+  scatterDots(bodies, y, 900, rng, null); y += 900; // dense field right at the top
   y = bigDots(bodies, y, rng, 4);
   y = chokePoint(bodies, y, rng);
   y = baffleComb(bodies, y, rng, 3);
@@ -828,10 +874,8 @@ export function buildCourse(rng, opts = {}) {
   const startY = startFunnel(bodies, rng);
   let y = layout(bodies, movers, rng, startY);
 
-  // Analyst gauntlet: dedicated paired walls right before the finish.
-  const gaunt = analystGauntlet(bodies, movers, y, rng, opts.analysts || []);
-  y = gaunt.y;
-  const analysts = gaunt.faces;
+  // Analysts spread across the whole race (not lumped before the finish).
+  const analysts = placeAnalystsSpread(bodies, movers, opts.analysts || [], startY + 1600, y - 900, rng);
 
   // Shared hard finish for every preset: one last dense bumper scatter then a
   // narrow funnel gate. No free-fall to the line; the goal is a tight bottleneck.

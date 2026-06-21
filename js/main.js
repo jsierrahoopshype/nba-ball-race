@@ -110,6 +110,14 @@ async function applyPick(i, raw, row) {
         syncRow(row, i);
       }
       else status(`couldn't load ${name} logo`);
+    } else if (raw.trim()) {
+      // Not a known player or team: treat it as a custom racer (e.g. a draft
+      // prospect). Keep any image already uploaded via IMG; just set the display
+      // name (last word, like the player list uses) so it shows in the race.
+      const words = raw.trim().split(/\s+/);
+      setup.setFullName(i, words[words.length - 1]);
+      if (!setup.balls[i].image) setup.setName(i, words[words.length - 1].slice(0, 5).toUpperCase());
+      syncRow(row, i);
     }
   } finally {
     row.classList.remove('loading');
