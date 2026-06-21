@@ -241,7 +241,7 @@ function startRace(seed, record = false) {
   camera = createCamera(race.course.courseLength);
   const lead = race.balls[0];
   camera.update(lead.position.x, lead.position.y, true, race.balls);
-  mode = (showIntroChk && !showIntroChk.checked) ? 'countdown' : 'intro';
+  mode = 'countdown'; // no intro card: go straight to the WHO WINS? countdown
   introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
   winnerRecorded = false; cardT = 0;
   downloadFired = false; recordingThisRace = record;
@@ -271,12 +271,7 @@ function loop(now) {
   let dt = (now - lastTime) / 1000; lastTime = now;
   if (dt > 0.25) dt = 0.25;
 
-  if (mode === 'intro') {
-    introT += dt;
-    if (introT >= INTRO_S) mode = 'countdown';
-    drawMatchup(ctx, race.balls, raceHook, race.mode);
-    return;
-  } else if (mode === 'countdown') {
+  if (mode === 'countdown') {
     countdownT += dt;
     if (countdownT >= COUNTDOWN_BEAT * 4) mode = 'racing';
   } else if (mode === 'racing') {
@@ -324,9 +319,9 @@ function loop(now) {
   drawLeaderboard(ctx, race.standings());
 
   if (mode === 'countdown') {
-    drawCountdown(ctx, Math.max(0, 3 - Math.floor(countdownT / COUNTDOWN_BEAT)));
+    drawCountdown(ctx, Math.max(0, 3 - Math.floor(countdownT / COUNTDOWN_BEAT)), raceHook);
   } else if (mode === 'racing' && race.step < 45) {
-    drawCountdown(ctx, 0);
+    drawCountdown(ctx, 0, raceHook);
   } else if (mode === 'finished') {
     drawWinner(ctx, race.standings(), winnerT);
     if (!recordingThisRace) status(`seed ${race.seed} | winner: ${race.winner.plugin.ball.label} | ${(race.winner.plugin.ball.finishStep / 60).toFixed(1)}s`);

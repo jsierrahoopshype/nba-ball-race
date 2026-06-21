@@ -21,29 +21,38 @@ const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
 // translucent panel so it reads over any background without eating the corner.
 export function drawLeaderboard(ctx, standings) {
   const top = standings.slice(0, 3);
-  const x = 40, startY = 130, rowH = 84, r = 30, panelW = 360;
+  const x = 28, startY = 108, rowH = 68, r = 26;
 
   ctx.save();
-  ctx.fillStyle = 'rgba(12,14,20,0.42)';
-  roundRect(ctx, x - 14, startY - r - 16, panelW, rowH * top.length + 18, 20);
-  ctx.fill();
-
+  ctx.textBaseline = 'middle';
   for (let i = 0; i < top.length; i++) {
     const p = top[i].plugin.ball;
     const cyc = startY + i * rowH;
+    const accent = i === 0 ? '#ffd34d' : '#ffffff';
 
-    ctx.fillStyle = i === 0 ? '#ffd34d' : '#ffffff';
-    ctx.font = '800 38px system-ui, sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(i + 1), x + 16, cyc);
+    // rank number on a small dark chip
+    ctx.fillStyle = 'rgba(8,10,14,0.6)';
+    roundRect(ctx, x - 4, cyc - 20, 40, 40, 10); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.font = '800 30px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(i + 1), x + 16, cyc + 1);
 
-    const fx = x + 56;
+    // face
+    const fx = x + 44;
     cardFace(ctx, p, fx + r, cyc, r, i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.85)');
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 38px system-ui, sans-serif';
+    // name on its own translucent-black pill, sized to the text so even long
+    // names (e.g. Antetokounmpo) are fully covered and readable
+    const name = p.name || p.label;
+    ctx.font = '700 30px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(p.name || p.label, fx + r * 2 + 18, cyc);
+    const tx = fx + r * 2 + 12;
+    const tw = ctx.measureText(name).width;
+    ctx.fillStyle = 'rgba(8,10,14,0.62)';
+    roundRect(ctx, tx - 12, cyc - 22, tw + 24, 44, 12); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.fillText(name, tx, cyc + 1);
   }
   ctx.restore();
 }
@@ -170,20 +179,31 @@ export function drawTournamentCard(ctx, info, isChampion) {
   });
 }
 
-export function drawCountdown(ctx, value) {
+export function drawCountdown(ctx, value, hook) {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.fillRect(0, 0, W, H);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+
+  // "WHO WINS?" above the count, in the middle of the course screen
+  ctx.lineWidth = 9; ctx.strokeStyle = '#15151a'; ctx.fillStyle = '#ffffff';
+  const title = (hook && hook.trim()) ? hook.trim().toUpperCase() : 'WHO WINS?';
+  // shrink the font if the custom question is long so it fits the width
+  let fs = 120;
+  ctx.font = `900 ${fs}px system-ui, sans-serif`;
+  while (ctx.measureText(title).width > W - 80 && fs > 50) { fs -= 6; ctx.font = `900 ${fs}px system-ui, sans-serif`; }
+  ctx.strokeText(title, W / 2, H * 0.27);
+  ctx.fillText(title, W / 2, H * 0.27);
+
   ctx.lineWidth = 14;
   ctx.strokeStyle = '#15151a';
   ctx.fillStyle = '#ffffff';
   ctx.font = '900 360px system-ui, sans-serif';
   const text = value === 0 ? 'GO!' : String(value);
-  ctx.strokeText(text, W / 2, H * 0.42);
-  ctx.fillText(text, W / 2, H * 0.42);
+  ctx.strokeText(text, W / 2, H * 0.52);
+  ctx.fillText(text, W / 2, H * 0.52);
   ctx.restore();
 }
 

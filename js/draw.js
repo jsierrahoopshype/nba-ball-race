@@ -30,6 +30,7 @@ function processFace(img) {
   let id;
   try { id = cx.getImageData(0, 0, w, h); } catch (e) { _faceCache.set(img, img); return img; }
   const a = id.data, n = w * h, ext = new Uint8Array(n), th = 18;
+  // flood-fill the exterior transparent area from the edges
   const stack = [];
   for (let x = 0; x < w; x++) { stack.push(x, x + (h - 1) * w); }
   for (let y = 0; y < h; y++) { stack.push(y * w, w - 1 + y * w); }
@@ -41,8 +42,40 @@ function processFace(img) {
     if (x > 0) stack.push(i - 1); if (x < w - 1) stack.push(i + 1);
     if (y > 0) stack.push(i - w); if (y < h - 1) stack.push(i + w);
   }
+  // interior holes = transparent pixels NOT connected to the outside (teeth,
+  // eye glints, eyebrow/skin specks left by background removal). Inpaint them
+  // with the colour of surrounding pixels (a ring-by-ring dilation) so they
+  // blend into skin/lips/eyes instead of showing as flat-grey noise.
+  let holes = [];
+  for (let i = 0; i < n; i++) if (a[i * 4 + 3] <= th && !ext[i]) holes.push(i);
+  const opaque = (j) => a[j * 4 + 3] > th && !ext[j];
+  let pass = 0;
+  while (holes.length && pass < 80) {
+    const updates = [], next = [];
+    for (const i of holes) {
+      const x = i % w, y = (i / w) | 0;
+      let r = 0, g = 0, b = 0, c = 0;
+      if (x > 0 && opaque(i - 1)) { r += a[(i - 1) * 4]; g += a[(i - 1) * 4 + 1]; b += a[(i - 1) * 4 + 2]; c++; }
+      if (x < w - 1 && opaque(i + 1)) { r += a[(i + 1) * 4]; g += a[(i + 1) * 4 + 1]; b += a[(i + 1) * 4 + 2]; c++; }
+      if (y > 0 && opaque(i - w)) { r += a[(i - w) * 4]; g += a[(i - w) * 4 + 1]; b += a[(i - w) * 4 + 2]; c++; }
+      if (y < h - 1 && opaque(i + w)) { r += a[(i + w) * 4]; g += a[(i + w) * 4 + 1]; b += a[(i + w) * 4 + 2]; c++; }
+      if (c > 0) updates.push([i, (r / c) | 0, (g / c) | 0, (b / c) | 0]);
+      else next.push(i);
+    }
+    if (!updates.length) break;
+    for (const [i, r, g, b] of updates) { a[i * 4] = r; a[i * 4 + 1] = g; a[i * 4 + 2] = b; a[i * 4 + 3] = 255; }
+    holes = next;
+    pass++;
+  }
+  // Solidify interior semi-transparent pixels (light eyebrows, hair wisps) so
+  // the backing colour can't bleed through them; keep the outline's smooth
+  // anti-aliased edge (pixels that border the transparent exterior).
   for (let i = 0; i < n; i++) {
-    if (a[i * 4 + 3] <= th && !ext[i]) { a[i * 4] = 238; a[i * 4 + 1] = 240; a[i * 4 + 2] = 243; a[i * 4 + 3] = 255; }
+    const al = a[i * 4 + 3];
+    if (ext[i] || al === 255 || al <= th) continue;
+    const x = i % w, y = (i / w) | 0;
+    const edge = (x > 0 && ext[i - 1]) || (x < w - 1 && ext[i + 1]) || (y > 0 && ext[i - w]) || (y < h - 1 && ext[i + w]);
+    if (!edge) a[i * 4 + 3] = 255;
   }
   cx.putImageData(id, 0, 0);
   _faceCache.set(img, cv);
