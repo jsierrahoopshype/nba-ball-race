@@ -607,8 +607,10 @@ function finishFunnel(bodies, y, rng, ballR = curBallR) {
 function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) {
   const phase = phase0 != null ? phase0 : rng.range(0, Math.PI * 2);
   const speed = rng.pick([-1, 1]) * rng.range(0.012, 0.019);
+  // isSensor: bubbles/emojis are visual decoration that orbit the analyst; they
+  // never physically block or trap a ball (balls pass through them).
   const body = Matter.Bodies.circle(cx + Math.cos(phase) * orbitR, cy + Math.sin(phase) * orbitR, bodyR,
-    { isStatic: true, label, restitution: 0.8, friction: 0.002 });
+    { isStatic: true, isSensor: true, label, restitution: 0.8, friction: 0.002 });
   bodies.push(body);
   movers.push({
     update: (step) => {
@@ -626,40 +628,50 @@ function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) 
 function placeAnalystsSpread(bodies, movers, spinners, aList, y0, y1, rng) {
   const faces = [];
   if (!aList.length) return faces;
-  const faceR = 168; // bigger
-  const bandHalf = faceR + 230; // tall clear band so the analyst stands alone
+  // Big faces, paired two-by-two. Capped so a pair still leaves a ball lane
+  // through the centre (two literal 2x faces would block the whole course).
+  // Big faces, paired two-by-two and sized large. They are visual-only (sensor)
+  // so a big pair never bottlenecks or jams the field; balls race past in front
+  // of them. A modest clear band gives them breathing room.
+  const faceR = 255;
+  const clearR = faceR + 36; // clear only the dots sitting ON the face, keep the rest
   const protectedSet = new Set([...(movers || []), ...(spinners || [])]);
-  const step = (y1 - y0) / aList.length;
-  aList.forEach((a, i) => {
-    const cy = y0 + step * (i + 0.5);
-    const left = i % 2 === 0;
-    const ax = left ? W * 0.4 : W * 0.6;
-    // isolate: clear other static obstacles in a full-width band around it, but
-    // never remove a moving part (would desync the mover/spinner update).
-    for (let k = bodies.length - 1; k >= 0; k--) {
-      const bd = bodies[k];
-      if (protectedSet.has(bd)) continue;
-      if ((bd.label === 'obstacle' || bd.label === 'bouncy') &&
-          bd.position.y > cy - bandHalf && bd.position.y < cy + bandHalf) bodies.splice(k, 1);
-    }
-    const face = peg(ax, cy, faceR, { restitution: 0.5, friction: 0.004 });
-    face.label = 'analyst';
-    face.plugin.analyst = {
-      name: a.name || '', image: a.image || null, speech: a.speech || '',
-      bubbleBody: null, emojiBodies: [],
-    };
-    bodies.push(face); faces.push(face);
-    if (a.speech && a.speech.trim()) {
-      const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 74, 72, 'analystbubble', rng, 0);
-      bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 74, faceR, speech: a.speech.trim() };
-      face.plugin.analyst.bubbleBody = bubble;
-    }
-    const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
-    glyphs.forEach((g, gi) => {
-      const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
-      const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 66, 56, 'analystemoji', rng, phase);
-      eb.plugin.emoji = { glyph: g };
-      face.plugin.analyst.emojiBodies.push(eb);
+  const pairs = [];
+  for (let i = 0; i < aList.length; i += 2) pairs.push(aList.slice(i, i + 2));
+  const step = (y1 - y0) / pairs.length;
+  pairs.forEach((pair, pi) => {
+    const cy = y0 + step * (pi + 0.5);
+    const xs = pair.length === 2 ? [W * 0.265, W * 0.735] : [W * 0.5];
+    xs.forEach((cxFace) => {
+      for (let k = bodies.length - 1; k >= 0; k--) {
+        const bd = bodies[k];
+        if (protectedSet.has(bd)) continue;
+        if ((bd.label === 'obstacle' || bd.label === 'bouncy') &&
+            Math.hypot(bd.position.x - cxFace, bd.position.y - cy) < clearR) bodies.splice(k, 1);
+      }
+    });
+    pair.forEach((a, k) => {
+      const ax = xs[k];
+      const face = peg(ax, cy, faceR, { restitution: 0.5, friction: 0.004 });
+      face.label = 'analyst';
+      face.isSensor = true; // visual presence only; never blocks or traps a ball
+      face.plugin.analyst = {
+        name: a.name || '', image: a.image || null, speech: a.speech || '',
+        bubbleBody: null, emojiBodies: [],
+      };
+      bodies.push(face); faces.push(face);
+      if (a.speech && a.speech.trim()) {
+        const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 70, 120, 'analystbubble', rng, 0);
+        bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 70, faceR, speech: a.speech.trim() };
+        face.plugin.analyst.bubbleBody = bubble;
+      }
+      const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
+      glyphs.forEach((g, gi) => {
+        const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
+        const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 64, 92, 'analystemoji', rng, phase);
+        eb.plugin.emoji = { glyph: g };
+        face.plugin.analyst.emojiBodies.push(eb);
+      });
     });
   });
   return faces;
@@ -751,6 +763,7 @@ function spinnerBar(bodies, movers, y, rng) {
 // Each layout returns the final y. They compose only blocks proven not to stick
 // (dots with wall semicircles, ramps, chokes, bumpers, the tested movers).
 // 'classic' is the balanced default and is left exactly as it was.
+
 function layoutClassic(bodies, movers, rng, startY = 360) {
   let y = startY;
   y = fairStart(bodies, y, rng);
@@ -760,7 +773,7 @@ function layoutClassic(bodies, movers, rng, startY = 360) {
   y = baffleComb(bodies, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
   y = turbine(bodies, movers, y, rng);
-  y = chokePoint(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
   y = bigDots(bodies, y, rng, 4);
   y = pendulums(bodies, movers, y, rng, 3);
   y = baffleComb(bodies, y, rng, 3);
@@ -772,7 +785,7 @@ function layoutClassic(bodies, movers, rng, startY = 360) {
   y = seesaw(bodies, movers, y, rng);
   y = baffleComb(bodies, y, rng, 3);
   y = bigDots(bodies, y, rng, 4);
-  y = chokePoint(bodies, y, rng);
+  y = bigDots(bodies, y, rng, 4);
   y = turbine(bodies, movers, y, rng);
   y = bigDots(bodies, y, rng, 4);
   y = sliders(bodies, movers, y, rng, 3);

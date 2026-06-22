@@ -13,8 +13,8 @@ export const CONFIG = {
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.38,   // lower ball-ball bounce: less "popping up" at clusters/bottlenecks
   BALL_FRICTION: 0.001,    // marble glides
-  BALL_AIR_FRICTION: 0.0022,  // light drag: balls keep falling naturally instead of stalling
-  MAX_SPEED: 34,           // px/step velocity cap: lower = no tunneling through thin bars, tighter pack
+  BALL_AIR_FRICTION: 0.0034,  // more drag: calmer descent, less hard plunging
+  MAX_SPEED: 30,           // lower top speed: calmer motion, no tunneling
 
   // Sticky surfaces: velocity multiplier applied every step while touching
   STICKY_DAMP_X: 0.97,
