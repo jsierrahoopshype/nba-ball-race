@@ -13,7 +13,7 @@ export const CONFIG = {
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.38,   // lower ball-ball bounce: less "popping up" at clusters/bottlenecks
   BALL_FRICTION: 0.001,    // marble glides
-  BALL_AIR_FRICTION: 0.0034,  // more drag: calmer descent, less hard plunging
+  BALL_AIR_FRICTION: 0.0034,  // calmer descent
   MAX_SPEED: 30,           // lower top speed: calmer motion, no tunneling
 
   // Sticky surfaces: velocity multiplier applied every step while touching
@@ -23,8 +23,13 @@ export const CONFIG = {
   // Anti-stall failsafe
   STALL_STEPS: 180,        // 3 seconds at 60 Hz
   PROGRESS_EPS: 10,
-  NUDGE_X: 6.0,
-  NUDGE_Y: 4.5,
+  NUDGE_X: 5.0,
+  NUDGE_Y: 3.0,
+  // Minimal anti-stick: a ball moving slower than STILL_SPEED for STILL_STEPS is
+  // resting on an obstacle; give it ONE small nudge to roll off. Fires only when
+  // stuck, so normal falling is untouched.
+  STILL_SPEED: 0.9,
+  STILL_STEPS: 42,         // ~0.7s without progress before a dislodge
 
   // Rubber band (moderate comebacks)
   RUBBER_GAP_MIN: 900,

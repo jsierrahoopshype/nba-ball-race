@@ -29,8 +29,8 @@ function rect(x, y, w, h, opts = {}) {
   return b;
 }
 function peg(x, y, r, opts = {}) {
-  const b = Matter.Bodies.circle(x, y, r, { isStatic: true, label: 'obstacle', friction: 0.004, ...opts });
-  b.restitution = opts.restitution != null ? opts.restitution : 0.5;
+  const b = Matter.Bodies.circle(x, y, r, { isStatic: true, label: 'obstacle', friction: 0.0015, ...opts });
+  b.restitution = opts.restitution != null ? opts.restitution : 0.58;
   return b;
 }
 
@@ -69,17 +69,21 @@ function edgePosts(bodies, yTop, yBot, rng) {
 // edge, while the skip-zone keeps dots off the feature so no pocket forms. Round
 // + wide-spaced (gap ~119px > ball) so balls pass through, nothing wedges.
 function scatterDots(bodies, y, h, rng, skip) {
-  const R = 58;
-  const x0 = R + Math.round(2.9 * curBallR), x1 = W - R - Math.round(2.9 * curBallR);
+  const R = 58, semiR = 84;
+  // ball-aware edge + wall semicircles fill the wall corner so a small ball
+  // can't drop into the wall channel and wedge against the first dot.
+  const edge = semiR + R + Math.round(2.9 * curBallR);
   const sx = 2 * R + Math.round(2.9 * curBallR);
   const sy = Math.round(2 * R + 1.6 * curBallR);
   let row = 0;
   for (let yy = y + 70; yy < y + h - 40; yy += sy, row++) {
     const off = (row % 2) ? sx / 2 : 0;
-    for (let x = x0 + off; x <= x1; x += sx) {
+    for (let x = edge + off; x <= W - edge; x += sx) {
       if (skip && skip(x, yy)) continue;
       bodies.push(peg(x + rng.range(-6, 6), yy, R, { restitution: 0.5 }));
     }
+    const L = wallSemi('L', yy, semiR); if (L) bodies.push(L);
+    const Rr = wallSemi('R', yy, semiR); if (Rr) bodies.push(Rr);
   }
 }
 
@@ -148,18 +152,18 @@ function fairStart(bodies, y, rng) {
   // and rolls off to both sides (symmetric, so fair; round, so nothing settles).
   // Then two symmetric rows of round pegs mix the field. Gaps are ball-aware.
   bodies.push(peg(W / 2, y + 150, 150, { restitution: 0.5 }));
-  const R = 58;
+  const R = 58, semiR = 84;
+  const edge = semiR + R + Math.round(2.9 * curBallR);
   const sx = 2 * R + Math.round(2.9 * curBallR);
   const sy = Math.round(2 * R + 1.7 * curBallR);
-  const half = Math.ceil((W / 2) / sx) + 1;
   for (let r = 0; r < 2; r++) {
     const ry = y + 150 + 230 + r * sy;
-    const centred = (r % 2 === 1);
-    for (let k = -half; k <= half; k++) {
-      const x = W / 2 + (centred ? k * sx : (k + 0.5) * sx);
-      if (x < 80 || x > W - 80) continue;
-      bodies.push(peg(x, ry, R, { restitution: 0.5 }));
+    const off = (r % 2) ? sx / 2 : 0;
+    for (let x = edge + off; x <= W - edge; x += sx) {
+      bodies.push(peg(x + rng.range(-6, 6), ry, R, { restitution: 0.5 }));
     }
+    const L = wallSemi('L', ry, semiR); if (L) bodies.push(L);
+    const Rr = wallSemi('R', ry, semiR); if (Rr) bodies.push(Rr);
   }
   return y + 150 + 230 + 2 * sy + 90;
 }
@@ -218,7 +222,7 @@ function dotsOnField(bodies, y, rng, rows = 4) {
     for (const x of xs) { bodies.push(peg(x, y + 60 + row * dotSy, dotR)); dots.push({x, y: y + 60 + row * dotSy}); }
   }
   // staggered pegs fill remaining gaps incl. the side gutters (no clear margin)
-  gridPegs(bodies, y, h, rng, 30, (px, py) => dots.some(d => Math.hypot(px - d.x, py - d.y) < dotR + 55));
+  gridPegs(bodies, y, h, rng, 38, (px, py) => dots.some(d => Math.hypot(px - d.x, py - d.y) < dotR + 55));
   return y + h;
 }
 
@@ -272,7 +276,7 @@ function diamondsOnField(bodies, y, rng, rows = 2) {
     const xs = (row % 2 === 0) ? [300, 540, 780] : [420, 660];
     for (const x of xs) { bodies.push(rect(x, ry, 160, 160, { angle: Math.PI / 4 })); dia.push({ x, y: ry }); }
   }
-  gridPegs(bodies, y, h, rng, 30, (px, py) => dia.some(d => Math.abs(px - d.x) < 165 && Math.abs(py - d.y) < 165));
+  gridPegs(bodies, y, h, rng, 38, (px, py) => dia.some(d => Math.abs(px - d.x) < 165 && Math.abs(py - d.y) < 165));
   return y + h + 120;
 }
 
@@ -607,10 +611,9 @@ function finishFunnel(bodies, y, rng, ballR = curBallR) {
 function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) {
   const phase = phase0 != null ? phase0 : rng.range(0, Math.PI * 2);
   const speed = rng.pick([-1, 1]) * rng.range(0.012, 0.019);
-  // isSensor: bubbles/emojis are visual decoration that orbit the analyst; they
-  // never physically block or trap a ball (balls pass through them).
+  // Solid: bubbles/emojis are obstacles balls bounce off too.
   const body = Matter.Bodies.circle(cx + Math.cos(phase) * orbitR, cy + Math.sin(phase) * orbitR, bodyR,
-    { isStatic: true, isSensor: true, label, restitution: 0.8, friction: 0.002 });
+    { isStatic: true, label, restitution: 0.8, friction: 0.002 });
   bodies.push(body);
   movers.push({
     update: (step) => {
@@ -628,20 +631,19 @@ function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) 
 function placeAnalystsSpread(bodies, movers, spinners, aList, y0, y1, rng) {
   const faces = [];
   if (!aList.length) return faces;
-  // Big faces, paired two-by-two. Capped so a pair still leaves a ball lane
-  // through the centre (two literal 2x faces would block the whole course).
-  // Big faces, paired two-by-two and sized large. They are visual-only (sensor)
-  // so a big pair never bottlenecks or jams the field; balls race past in front
-  // of them. A modest clear band gives them breathing room.
-  const faceR = 255;
-  const clearR = faceR + 36; // clear only the dots sitting ON the face, keep the rest
+  // Solid faces the balls bounce off, paired two-by-two as a CENTRE blob with a
+  // wide ball lane down each side. Sized so the side lanes stay far wider than a
+  // ball (a full-width solid pair would wall off the course). A ball-aware clear
+  // ring around each face stops a ball wedging between the solid face and a dot.
+  const faceR = 200;
+  const clearR = faceR + Math.round(2.4 * curBallR);
   const protectedSet = new Set([...(movers || []), ...(spinners || [])]);
   const pairs = [];
   for (let i = 0; i < aList.length; i += 2) pairs.push(aList.slice(i, i + 2));
   const step = (y1 - y0) / pairs.length;
   pairs.forEach((pair, pi) => {
     const cy = y0 + step * (pi + 0.5);
-    const xs = pair.length === 2 ? [W * 0.265, W * 0.735] : [W * 0.5];
+    const xs = pair.length === 2 ? [W * 0.38, W * 0.62] : [W * 0.5];
     xs.forEach((cxFace) => {
       for (let k = bodies.length - 1; k >= 0; k--) {
         const bd = bodies[k];
@@ -653,22 +655,21 @@ function placeAnalystsSpread(bodies, movers, spinners, aList, y0, y1, rng) {
     pair.forEach((a, k) => {
       const ax = xs[k];
       const face = peg(ax, cy, faceR, { restitution: 0.5, friction: 0.004 });
-      face.label = 'analyst';
-      face.isSensor = true; // visual presence only; never blocks or traps a ball
+      face.label = 'analyst'; // SOLID: balls bounce off the analysts
       face.plugin.analyst = {
         name: a.name || '', image: a.image || null, speech: a.speech || '',
         bubbleBody: null, emojiBodies: [],
       };
       bodies.push(face); faces.push(face);
       if (a.speech && a.speech.trim()) {
-        const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 70, 120, 'analystbubble', rng, 0);
-        bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 70, faceR, speech: a.speech.trim() };
+        const bubble = makeOrbiter(bodies, movers, ax, cy, faceR + 64, 110, 'analystbubble', rng, 0);
+        bubble.plugin.bubble = { cx: ax, cy, orbitR: faceR + 64, faceR, speech: a.speech.trim() };
         face.plugin.analyst.bubbleBody = bubble;
       }
       const glyphs = [...((a.emoji || '').trim())].filter((g) => g.trim()).slice(0, 4);
       glyphs.forEach((g, gi) => {
         const phase = Math.PI + (gi + 1) * (Math.PI * 1.2 / (glyphs.length + 1));
-        const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 64, 92, 'analystemoji', rng, phase);
+        const eb = makeOrbiter(bodies, movers, ax, cy, faceR + 58, 84, 'analystemoji', rng, phase);
         eb.plugin.emoji = { glyph: g };
         face.plugin.analyst.emojiBodies.push(eb);
       });
@@ -734,7 +735,7 @@ function startFunnel(bodies, rng, ballR = curBallR) {
 // (every ledge is tilted downhill toward its open end). Balls weave left-right
 // down the cascade. Ledges alternate sides so nothing piles in the middle.
 function baffleComb(bodies, y, rng, rows = 3, ballR = curBallR) {
-  const barH = 58, slope = 0.52, ledgeLen = W * 0.5;
+  const barH = 58, slope = 0.7, ledgeLen = W * 0.46;
   for (let r = 0; r < rows; r++) {
     const ry = y + 130 + r * 200;
     const left = r % 2 === 0;

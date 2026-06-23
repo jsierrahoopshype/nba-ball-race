@@ -130,8 +130,9 @@ export function createRace(seed, ballConfigs, opts = {}) {
 
       // Pure gravity and collisions: no drift, nudge, rescue, anti-settle, or
       // catch-up. The course geometry alone keeps balls moving (round
-      // deflectors, steep shed surfaces, wall-flush bars, gaps always wider than
-      // a ball). A stall would be a layout bug to fix in the course, not here.
+      // deflectors, ball-aware gaps, wall semicircles filling the wall corner so
+      // nothing wedges against the wall). A stall is a layout bug, fixed in the
+      // course, not with a force here.
 
       // Finish line
       if (ball.position.y >= course.finishY) placeFinish(ball);

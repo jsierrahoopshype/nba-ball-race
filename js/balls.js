@@ -74,6 +74,9 @@ export function makeBalls(configs, rng) {
       imageFit: cfg.imageFit || 'cover', // 'face' for headshots, 'cover' for logos/uploads
       bestY: body.position.y,
       stallSteps: 0,
+      stillSteps: 0,
+      nudgeSalt: i, // per-ball deterministic salt for the anti-stick nudge direction
+      nudgeCount: 0,
       ghostSteps: 0,
       finished: false,
       finishStep: null,
