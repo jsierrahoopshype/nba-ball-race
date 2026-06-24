@@ -617,9 +617,11 @@ function finishFunnel(bodies, y, rng, ballR = curBallR) {
 function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) {
   const phase = phase0 != null ? phase0 : rng.range(0, Math.PI * 2);
   const speed = rng.pick([-1, 1]) * rng.range(0.012, 0.019);
-  // Solid: bubbles/emojis are obstacles balls bounce off too.
+  // Visual decoration that orbits the analyst: the FACES are the solid obstacle
+  // balls bounce off; the bubble/emoji are sensors so they never form a block
+  // wedged between the two faces (which is what they did when solid).
   const body = Matter.Bodies.circle(cx + Math.cos(phase) * orbitR, cy + Math.sin(phase) * orbitR, bodyR,
-    { isStatic: true, label, restitution: 0.8, friction: 0.002 });
+    { isStatic: true, isSensor: true, label, restitution: 0.8, friction: 0.002 });
   bodies.push(body);
   movers.push({
     update: (step) => {
@@ -641,7 +643,7 @@ function placeAnalystsSpread(bodies, movers, spinners, aList, y0, y1, rng) {
   // wide ball lane down each side. Sized so the side lanes stay far wider than a
   // ball (a full-width solid pair would wall off the course). A ball-aware clear
   // ring around each face stops a ball wedging between the solid face and a dot.
-  const faceR = 200;
+  const faceR = 170;
   const clearR = faceR + Math.round(2.4 * curBallR);
   const protectedSet = new Set([...(movers || []), ...(spinners || [])]);
   const pairs = [];
@@ -649,7 +651,7 @@ function placeAnalystsSpread(bodies, movers, spinners, aList, y0, y1, rng) {
   const step = (y1 - y0) / pairs.length;
   pairs.forEach((pair, pi) => {
     const cy = y0 + step * (pi + 0.5);
-    const xs = pair.length === 2 ? [W * 0.38, W * 0.62] : [W * 0.5];
+    const xs = pair.length === 2 ? [W * 0.28, W * 0.72] : [W * 0.5];
     xs.forEach((cxFace) => {
       for (let k = bodies.length - 1; k >= 0; k--) {
         const bd = bodies[k];
