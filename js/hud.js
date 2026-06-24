@@ -262,3 +262,26 @@ export function drawWinner(ctx, standings, t) {
   }
   ctx.restore();
 }
+
+// Running race clock for time-limit mode: a bold MM:SS pill at the top centre,
+// turning red and pulsing under the final 5 seconds. `secsLeft` is clamped >= 0.
+export function drawRaceClock(ctx, secsLeft) {
+  const s = Math.max(0, secsLeft);
+  const txt = s >= 10 ? s.toFixed(0) : s.toFixed(1);
+  const urgent = s <= 5;
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W / 2, cy = 96;
+  // pill
+  ctx.font = '900 72px system-ui, sans-serif';
+  const w = Math.max(190, ctx.measureText(txt + 's').width + 80), h = 116;
+  const pulse = urgent ? 1 + 0.05 * Math.sin(s * Math.PI * 4) : 1;
+  ctx.translate(cx, cy); ctx.scale(pulse, pulse); ctx.translate(-cx, -cy);
+  roundRect(ctx, cx - w / 2, cy - h / 2, w, h, 26);
+  ctx.fillStyle = urgent ? 'rgba(200,16,46,0.92)' : 'rgba(21,21,26,0.82)';
+  ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(txt + 's', cx, cy + 4);
+  ctx.restore();
+}

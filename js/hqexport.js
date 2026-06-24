@@ -9,7 +9,7 @@
 import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
-import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup } from './hud.js';
+import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawRaceClock } from './hud.js';
 import { CONFIG } from './config.js';
 
 const MUXER_URL = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.0.3/+esm';
@@ -113,6 +113,7 @@ export async function exportHQ(params, onProgress = () => {}) {
     cam.update(a.position.x, a.plugin.ball.bestY, false, race.balls);
     drawWorld(ctx, race, cam);
     drawLeaderboard(ctx, race.standings());
+    if (race.countdownSteps) drawRaceClock(ctx, (race.countdownSteps - race.step) / 60);
     emit();
     if (frame % STEP === 0) { onProgress('racing', frame, estTotal); await yieldToUI(); }
   }

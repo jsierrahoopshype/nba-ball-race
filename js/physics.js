@@ -43,6 +43,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
   const race = {
     seed, engine, balls, course, mode,
     step: 0,
+    countdownSteps: opts.countdownS ? Math.round(opts.countdownS * 60) : 0,
     winner: null,         // first ball to cross the line (or lone survivor)
     finishOrder: [],      // balls in the order they finished (final standings)
     eliminatedOrder: [],  // survivor mode: balls in the order they were eliminated
@@ -159,6 +160,16 @@ export function createRace(seed, ballConfigs, opts = {}) {
 
     // Absolute safety cap
     if (race.step > CONFIG.HARD_TIMEOUT_S * 60) {
+      [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
+        .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
+        .forEach(placeFinish);
+    }
+
+    // Countdown mode: a hard time limit. At the buzzer, freeze and rank everyone
+    // where they are. Finishers keep their order; the rest are ranked by how far
+    // down the course they got. Side effect: a stuck ball just lands wherever it
+    // is, so sticking never drags out the clip.
+    if (race.countdownSteps && race.step >= race.countdownSteps) {
       [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
         .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
         .forEach(placeFinish);

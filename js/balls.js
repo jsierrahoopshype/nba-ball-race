@@ -35,11 +35,17 @@ export function ballRadiusForCount(n) {
 export function makeBalls(configs, rng) {
   const n = configs.length;
   const radius = ballRadiusForCount(n);
-  // Tight central cluster: just over one ball-width between slots, so the field
-  // drops together and fights immediately instead of outer balls getting clean
-  // side lanes. Still wide enough that they never overlap at spawn.
-  const slotW = Math.min(2 * radius + 14, (CONFIG.WORLD_W - 220) / Math.max(1, n - 1));
-  const startX = CONFIG.WORLD_W / 2 - slotW * (n - 1) / 2;
+  // Seeded formation, varied per race so a series never drops from the same
+  // spot. Spread ranges from a tight cluster to a wide line; the whole line is
+  // then placed left, centre, or right (seeded). The slot SHUFFLE below still
+  // decorrelates ball identity from position, so it stays fair within a race.
+  const spread = rng.range(0.8, 1.95);
+  const slotW = Math.min((2 * radius + 14) * spread, (CONFIG.WORLD_W - 200) / Math.max(1, n - 1));
+  const lineW = slotW * (n - 1);
+  const margin = 120 + radius;
+  const minX = margin;
+  const maxX = CONFIG.WORLD_W - margin - lineW;
+  const startX = (maxX > minX) ? rng.range(minX, maxX) : (CONFIG.WORLD_W - lineW) / 2;
 
   // Seeded shuffle of start slots: the course can have a faster side, so we
   // decorrelate ball identity from start position. Over many seeds every ball

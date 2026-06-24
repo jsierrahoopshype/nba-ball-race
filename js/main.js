@@ -7,7 +7,7 @@ import { freshSeed } from './rng.js';
 import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
-import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawTournamentCard } from './hud.js';
+import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawTournamentCard, drawRaceClock } from './hud.js';
 import { exportHQ, webCodecsSupported } from './hqexport.js';
 import { createRecorder } from './recorder.js';
 import { createSetup } from './setup.js';
@@ -238,7 +238,9 @@ function startRace(seed, record = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
-  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias() };
+  const timeLimitEl = document.getElementById('time-limit');
+  const countdownS = timeLimitEl ? (parseInt(timeLimitEl.value, 10) || 0) : 0;
+  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS };
   race = createRace(seed, setup.toConfigs(), raceOpts);
   race.bg = currentBg();
   // remember exactly how this race was built so HQ export reproduces it
@@ -333,6 +335,10 @@ function loop(now) {
   } else if (mode === 'finished') {
     drawWinner(ctx, race.standings(), winnerT);
     if (!recordingThisRace) status(`seed ${race.seed} | winner: ${race.winner.plugin.ball.label} | ${(race.winner.plugin.ball.finishStep / 60).toFixed(1)}s`);
+  }
+  // Running clock for time-limit mode, shown once the GO! countdown clears.
+  if (race.countdownSteps && (mode === 'racing' || mode === 'finished') && !(mode === 'racing' && race.step < 45)) {
+    drawRaceClock(ctx, (race.countdownSteps - race.step) / 60);
   }
 }
 

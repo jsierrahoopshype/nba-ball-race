@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=46">
+<link rel="stylesheet" href="css/editor.css?v=47">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.44</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.45</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -35,6 +35,15 @@
           <select id="win-mode">
             <option value="finish">First to finish</option>
             <option value="survivor">Last ball standing</option>
+          </select>
+        </label>
+        <label class="count-field">time limit
+          <select id="time-limit">
+            <option value="0">Off (race to finish)</option>
+            <option value="20">20s buzzer</option>
+            <option value="30">30s buzzer</option>
+            <option value="45">45s buzzer</option>
+            <option value="60">60s buzzer</option>
           </select>
         </label>
         <label class="count-field" style="flex:1 1 240px">hook
@@ -107,6 +116,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=46"></script>
+  <script type="module" src="js/main.js?v=47"></script>
 </body>
 </html>
