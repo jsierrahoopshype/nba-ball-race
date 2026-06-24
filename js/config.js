@@ -11,7 +11,7 @@ export const CONFIG = {
   // Physics feel: bouncy and quick, grind comes from sticky zones and gates
   GRAVITY_Y: 1.05,
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
-  BALL_RESTITUTION: 0.38,   // lower ball-ball bounce: less "popping up" at clusters/bottlenecks
+  BALL_RESTITUTION: 0.46,   // 20% bouncier balls
   BALL_FRICTION: 0.001,    // marble glides
   BALL_AIR_FRICTION: 0.0034,  // calmer descent
   MAX_SPEED: 30,           // lower top speed: calmer motion, no tunneling

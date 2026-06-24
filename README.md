@@ -1,6 +1,6 @@
 # NBA Ball Race
 
-Vertical (9:16) physics racing game for NBA social clips. Phase 2.41 of 5.
+Vertical (9:16) physics racing game for NBA social clips. Phase 2.42 of 5.
 
 ## Run it
 

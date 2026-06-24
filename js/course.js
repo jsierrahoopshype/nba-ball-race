@@ -30,7 +30,7 @@ function rect(x, y, w, h, opts = {}) {
 }
 function peg(x, y, r, opts = {}) {
   const b = Matter.Bodies.circle(x, y, r, { isStatic: true, label: 'obstacle', friction: 0.0015, ...opts });
-  b.restitution = opts.restitution != null ? opts.restitution : 0.58;
+  b.restitution = opts.restitution != null ? opts.restitution : 0.6;
   return b;
 }
 
@@ -80,7 +80,7 @@ function scatterDots(bodies, y, h, rng, skip) {
     const off = (row % 2) ? sx / 2 : 0;
     for (let x = edge + off; x <= W - edge; x += sx) {
       if (skip && skip(x, yy)) continue;
-      bodies.push(peg(x + rng.range(-6, 6), yy, R, { restitution: 0.5 }));
+      bodies.push(peg(x + rng.range(-6, 6), yy, R, { restitution: 0.6 }));
     }
     const L = wallSemi('L', yy, semiR); if (L) bodies.push(L);
     const Rr = wallSemi('R', yy, semiR); if (Rr) bodies.push(Rr);
@@ -148,24 +148,30 @@ function blobChannel(bodies, y, rng, rows = 12) {
 // thing the field hits, so the start is fair; the seeded slot shuffle in
 // makeBalls then decorrelates identity from position across seeds.
 function fairStart(bodies, y, rng) {
-  // A big round splitter dead-centre, right under the spawn: the cluster hits it
-  // and rolls off to both sides (symmetric, so fair; round, so nothing settles).
-  // Then two symmetric rows of round pegs mix the field. Gaps are ball-aware.
-  bodies.push(peg(W / 2, y + 150, 150, { restitution: 0.5 }));
-  const R = 58, semiR = 84;
+  // Plinko right at the start: symmetric peg rows centred on the middle, so every
+  // ball drops into the same field and scatters the same way. No central splitter
+  // (which only the middle balls hit, letting the edge balls fall past for a free
+  // head start). Even rows have a centre peg; odd rows are offset half a step.
+  const R = 64, semiR = 84;
   const edge = semiR + R + Math.round(2.9 * curBallR);
   const sx = 2 * R + Math.round(2.9 * curBallR);
   const sy = Math.round(2 * R + 1.7 * curBallR);
-  for (let r = 0; r < 2; r++) {
-    const ry = y + 150 + 230 + r * sy;
-    const off = (r % 2) ? sx / 2 : 0;
-    for (let x = edge + off; x <= W - edge; x += sx) {
-      bodies.push(peg(x + rng.range(-6, 6), ry, R, { restitution: 0.5 }));
+  const rows = 4;
+  for (let r = 0; r < rows; r++) {
+    const ry = y + 120 + r * sy;
+    const centred = (r % 2 === 0);
+    for (let k = 0; k * sx <= W / 2; k++) {
+      const dx = centred ? k * sx : (k + 0.5) * sx;
+      const xs = (k === 0 && centred) ? [W / 2] : [W / 2 - dx, W / 2 + dx];
+      for (const x of xs) {
+        if (x < edge || x > W - edge) continue;
+        bodies.push(peg(x, ry, R, { restitution: 0.6 }));
+      }
     }
     const L = wallSemi('L', ry, semiR); if (L) bodies.push(L);
     const Rr = wallSemi('R', ry, semiR); if (Rr) bodies.push(Rr);
   }
-  return y + 150 + 230 + 2 * sy + 90;
+  return y + 120 + rows * sy + 80;
 }
 
 function bigDots(bodies, y, rng, rows = 4) {
@@ -179,7 +185,7 @@ function bigDots(bodies, y, rng, rows = 4) {
     const ry = y + 70 + r * sy;
     const off = (r % 2) ? sx / 2 : 0;
     for (let x = edge + off; x <= W - edge; x += sx) {
-      bodies.push(peg(x + rng.range(-8, 8), ry, R, { restitution: 0.5 }));
+      bodies.push(peg(x + rng.range(-8, 8), ry, R, { restitution: 0.6 }));
     }
     const L = wallSemi('L', ry, semiR); if (L) bodies.push(L);
     const Rr = wallSemi('R', ry, semiR); if (Rr) bodies.push(Rr);
