@@ -617,11 +617,14 @@ function finishFunnel(bodies, y, rng, ballR = curBallR) {
 function makeOrbiter(bodies, movers, cx, cy, orbitR, bodyR, label, rng, phase0) {
   const phase = phase0 != null ? phase0 : rng.range(0, Math.PI * 2);
   const speed = rng.pick([-1, 1]) * rng.range(0.012, 0.019);
-  // Visual decoration that orbits the analyst: the FACES are the solid obstacle
-  // balls bounce off; the bubble/emoji are sensors so they never form a block
-  // wedged between the two faces (which is what they did when solid).
-  const body = Matter.Bodies.circle(cx + Math.cos(phase) * orbitR, cy + Math.sin(phase) * orbitR, bodyR,
-    { isStatic: true, isSensor: true, label, restitution: 0.8, friction: 0.002 });
+  // Solid obstacle balls bounce off, but the PHYSICS core is smaller than the
+  // drawn bubble/emoji (sized so balls bounce right at the visible edge). A big
+  // solid body swinging through the narrow lanes can pin a ball against a face
+  // and stall the race; a small core bounces balls without trapping them.
+  const physR = Math.max(34, Math.round(bodyR - 46));
+  const body = Matter.Bodies.circle(cx + Math.cos(phase) * orbitR, cy + Math.sin(phase) * orbitR, physR,
+    { isStatic: true, label, restitution: 0.8, friction: 0.002 });
+  body.plugin.visR = bodyR; // draw at the full visual size
   bodies.push(body);
   movers.push({
     update: (step) => {

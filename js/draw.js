@@ -287,11 +287,11 @@ function drawAnalyst(ctx, body, a) {
   // Orbiting comic bubble (drawn at the engine-positioned bubble body)
   const bub = a.bubbleBody;
   if (bub && bub.plugin.bubble && bub.plugin.bubble.speech) {
-    drawComicBubble(ctx, bub.position.x, bub.position.y, bub.circleRadius, bub.plugin.bubble.speech, x, y);
+    drawComicBubble(ctx, bub.position.x, bub.position.y, bub.plugin.visR || bub.circleRadius, bub.plugin.bubble.speech, x, y);
   }
   // Orbiting emoji obstacles
   for (const eb of (a.emojiBodies || [])) {
-    const ex = eb.position.x, ey = eb.position.y, er = eb.circleRadius;
+    const ex = eb.position.x, ey = eb.position.y, er = eb.plugin.visR || eb.circleRadius;
     ctx.save();
     ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2);
     ctx.fillStyle = '#fff'; ctx.fill();
