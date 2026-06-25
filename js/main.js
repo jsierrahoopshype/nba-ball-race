@@ -94,7 +94,7 @@ async function applyPick(i, raw, row) {
       const [short, , id, file] = player;
       const img = await loadImage(HEADSHOT_URL(file));
       if (img) {
-        setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); setup.setFullName(i, player[1].split(' ').slice(-1)[0]);
+        setup.setImage(i, img, `player:${id}`, 'face'); setup.setName(i, short); setup.setFullName(i, player[1]);
         const tc = teamColorsForPlayer(id);
         if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
         syncRow(row, i);
@@ -112,10 +112,10 @@ async function applyPick(i, raw, row) {
       else status(`couldn't load ${name} logo`);
     } else if (raw.trim()) {
       // Not a known player or team: treat it as a custom racer (e.g. a draft
-      // prospect). Keep any image already uploaded via IMG; just set the display
-      // name (last word, like the player list uses) so it shows in the race.
+      // prospect). Keep any image already uploaded via IMG; use the full typed
+      // name in the ranking, and a short label on the ball.
       const words = raw.trim().split(/\s+/);
-      setup.setFullName(i, words[words.length - 1]);
+      setup.setFullName(i, raw.trim());
       if (!setup.balls[i].image) setup.setName(i, words[words.length - 1].slice(0, 5).toUpperCase());
       syncRow(row, i);
     }
@@ -209,7 +209,7 @@ function autoloadFaces() {
     if (!p) return;
     loadImage(HEADSHOT_URL(p[3])).then(img => {
       if (img && !setup.balls[i].image) {
-        setup.setImage(i, img, `player:${p[2]}`, 'face'); setup.setFullName(i, p[1].split(' ').slice(-1)[0]); // p[1]=full name
+        setup.setImage(i, img, `player:${p[2]}`, 'face'); setup.setFullName(i, p[1]); // p[1]=full name
         const tc = teamColorsForPlayer(p[2]);
         if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
         const row = ballRowsEl.children[i];
@@ -333,9 +333,11 @@ function loop(now) {
     return;
   } else if (mode === 'champion') {
     cardT += dt;
-    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'champion', cardT);
-    else drawTournamentCard(ctx, tournamentInfo(), true);
-    status(tournament.type === 'qualifier' ? 'series champion crowned' : `series winner: race ${tournament.raceNum} of ${tournament.format}`);
+    const champBall = tournament.type === 'qualifier'
+      ? (tournament.championBall || race.winner)
+      : (race.balls.find(b => b.plugin.ball.id === tournament.championId) || race.winner);
+    drawQualifierCard(ctx, { championBall: champBall }, 'champion', cardT);
+    status('series champion crowned');
     return;
   }
 

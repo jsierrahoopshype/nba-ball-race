@@ -100,6 +100,30 @@ function processFace(img) {
 // Draw the FULL head INSIDE a circular ball: a colored disk, the whole head
 // scaled to fit within the circle (not cropped tight) and clipped to it, plus a
 // thin ring. This is the "face inside the ball" look.
+// Clean headshot for cards/rankings: the head cutout on a neutral disk, no
+// team-colored ball. Optional ring (e.g. rank colour).
+export function drawCardHeadshot(ctx, img, cx, cy, r, ringColor) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.28)'; ctx.shadowBlur = Math.max(8, r * 0.2); ctx.shadowOffsetY = Math.max(3, r * 0.09);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  const g = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+  g.addColorStop(0, '#eef2f7'); g.addColorStop(1, '#c9d3e0');
+  ctx.fillStyle = g; ctx.fill();
+  ctx.restore();
+  const face = processFace(img);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
+  const scale = (1.72 * r) / (img.height * 0.62);
+  const w = img.width * scale, h = img.height * scale;
+  ctx.drawImage(face, cx - w / 2, cy - h * 0.4, w, h);
+  ctx.restore();
+  if (ringColor) {
+    const bw = Math.max(3, r * 0.07);
+    ctx.beginPath(); ctx.arc(cx, cy, r - bw / 2, 0, Math.PI * 2);
+    ctx.lineWidth = bw; ctx.strokeStyle = ringColor; ctx.stroke();
+  }
+}
+
 export function drawFaceInCircle(ctx, img, cx, cy, r, color, color2, ringColor) {
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = Math.max(8, r * 0.22); ctx.shadowOffsetY = Math.max(3, r * 0.1);

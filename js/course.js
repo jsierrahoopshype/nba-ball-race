@@ -388,6 +388,36 @@ function chokePoint(bodies, y, rng, ballR = curBallR) {
   return y + 2 * R - 40;
 }
 
+// Anti-bypass finish: solid columns of big rounded pegs hug each wall (their
+// round inner faces deflect any wall-rider back toward the middle), with a dense
+// bouncy plinko filling the central corridor. No clear side lane, so every ball
+// must run the gauntlet. `span` lets the qualifier heats use a shorter version.
+function thrillerFinish(bodies, y, rng, span = 1300) {
+  const inset = 175;
+  // Big, heavily-overlapped wall pegs: SMOOTH inner arc (no scallop pockets to
+  // wedge in) that still deflects any wall-rider back toward centre.
+  const rr = 230;
+  const cxL = inset - rr + 18, cxR = W - inset + rr - 18;
+  const stepY = Math.round(rr * 0.6);
+  for (let yy = y + 40; yy < y + span; yy += stepY) {
+    bodies.push(peg(cxL, yy, rr, { restitution: 0.5, friction: 0.004 }));
+    bodies.push(peg(cxR, yy, rr, { restitution: 0.5, friction: 0.004 }));
+  }
+  // Central bouncy plinko, not too dense so a lone ball can't settle in a valley
+  // and stall the finish; bouncy so balls keep moving.
+  const R = 52;
+  const sx = 2 * R + Math.round(3.3 * curBallR);
+  const sy = Math.round(2 * R + 2.0 * curBallR);
+  let row = 0;
+  for (let yy = y + 150; yy < y + span - 80; yy += sy, row++) {
+    const off = (row % 2) ? sx / 2 : 0;
+    for (let x = inset + 60 + off; x <= W - inset - 60; x += sx) {
+      bodies.push(peg(x + rng.range(-6, 6), yy, R, { restitution: 0.8 }));
+    }
+  }
+  return y + span;
+}
+
 function popBumpers(bodies, y, rng) {
   const spots = [[330, 150], [540, 280], [750, 150], [430, 430], [650, 430]];
   for (const [x, dy] of spots) bodies.push(peg(x, y + dy, 58, { label: 'bouncy', restitution: 0.95 }));
@@ -914,11 +944,9 @@ export function buildCourse(rng, opts = {}) {
   // bigger and isolated in their own clear bands.
   const analysts = placeAnalystsSpread(bodies, movers, spinnerList, opts.analysts || [], startY + 1600, y - 900, rng);
 
-  // Dense, dramatic run-in to the finish: a packed scatter then a dot field so
-  // the field bunches up and the winner isn't settled until the last moment.
-  const runIn = scale < 1 ? 600 : 1300;
-  scatterDots(bodies, y, runIn, rng, null); y += runIn;
-  y = bigDots(bodies, y, rng, 4);
+  // Anti-bypass finish run-in: solid deflecting side walls + dense central
+  // plinko so nobody can ride a wall past the chaos. Shorter for qualifier heats.
+  y = thrillerFinish(bodies, y, rng, scale < 1 ? 780 : 1300);
 
   // Shared hard finish for every preset: one last dense bumper scatter then a
   // narrow funnel gate. No free-fall to the line; the goal is a tight bottleneck.
