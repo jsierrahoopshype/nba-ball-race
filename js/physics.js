@@ -44,6 +44,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
     seed, engine, balls, course, mode,
     step: 0,
     countdownSteps: opts.countdownS ? Math.round(opts.countdownS * 60) : 0,
+    tailS: opts.tailS || 0,
     winner: null,         // first ball to cross the line (or lone survivor)
     finishOrder: [],      // balls in the order they finished (final standings)
     eliminatedOrder: [],  // survivor mode: balls in the order they were eliminated
@@ -154,7 +155,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
     // ball must get the full clock to finish (and qualify).
     if (race.winner && !race.countdownSteps) {
       const tail = race.step - race.winner.plugin.ball.finishStep;
-      if (tail > CONFIG.TAIL_S * 60) {
+      if (tail > (race.tailS || CONFIG.TAIL_S) * 60) {
         [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
           .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
           .forEach(b => placeFinish(b));

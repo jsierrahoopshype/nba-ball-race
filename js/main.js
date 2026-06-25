@@ -234,7 +234,7 @@ let raceHook = '', raceMode = 'finish';
 const COUNTDOWN_BEAT = 0.5;
 const INTRO_S = 1.4;
 
-function startRace(seed, record = false, configsOverride = null, countdownOverride = null, lengthScaleOverride = null) {
+function startRace(seed, record = false, configsOverride = null, countdownOverride = null, lengthScaleOverride = null, tailSOverride = null) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
@@ -242,8 +242,9 @@ function startRace(seed, record = false, configsOverride = null, countdownOverri
   const uiCountdown = timeLimitEl ? (parseInt(timeLimitEl.value, 10) || 0) : 0;
   const countdownS = countdownOverride != null ? countdownOverride : uiCountdown;
   const lengthScale = lengthScaleOverride != null ? lengthScaleOverride : 1;
+  const tailS = tailSOverride != null ? tailSOverride : 0;
   const configs = configsOverride || setup.toConfigs();
-  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS, lengthScale };
+  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS, lengthScale, tailS };
   race = createRace(seed, configs, raceOpts);
   race.bg = currentBg();
   // remember exactly how this race was built so HQ export reproduces it
@@ -311,7 +312,7 @@ function loop(now) {
     if (winnerT > 3.2) {
       finishRecording();
       if (tournament && !tournament.championId) { mode = 'roundcard'; cardT = 0; }
-      else if (tournament && tournament.championId) { mode = 'champion'; }
+      else if (tournament && tournament.championId) { mode = 'champion'; cardT = 0; }
     }
   } else if (mode === 'roundcard') {
     cardT += dt;
@@ -322,7 +323,8 @@ function loop(now) {
         tournament.round++;
         const isFinal = tournament.round >= tournament.totalRounds;
         startRace((tournament.baseSeed + tournament.round * 7919) >>> 0, false,
-          tournament.roster, isFinal ? 0 : tournament.qualifyS, isFinal ? 1 : tournament.qScale);
+          tournament.roster, isFinal ? 0 : tournament.qualifyS, isFinal ? 1 : tournament.qScale,
+          isFinal ? 45 : null);
       } else {
         tournament.raceNum++;
         startRace((tournament.baseSeed + tournament.raceNum * 7919) >>> 0);
@@ -330,7 +332,8 @@ function loop(now) {
     }
     return;
   } else if (mode === 'champion') {
-    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'champion');
+    cardT += dt;
+    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'champion', cardT);
     else drawTournamentCard(ctx, tournamentInfo(), true);
     status(tournament.type === 'qualifier' ? 'series champion crowned' : `series winner: race ${tournament.raceNum} of ${tournament.format}`);
     return;

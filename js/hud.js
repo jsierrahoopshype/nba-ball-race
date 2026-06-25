@@ -264,7 +264,18 @@ export function drawWinner(ctx, standings, t) {
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 52px system-ui, sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(rb.name || rb.label, lx + rr + 30, y);
+    const timeStr = rb.crossed ? `${(rb.finishStep / 60).toFixed(2)}s` : 'DNF';
+    // name, shrunk if needed so it never collides with the time on the right
+    const nameRight = W * 0.80, nameLeft = lx + rr + 30;
+    let nm = rb.name || rb.label, nfs = 52;
+    ctx.font = `700 ${nfs}px system-ui, sans-serif`;
+    while (ctx.measureText(nm).width > (nameRight - 150) - nameLeft && nfs > 30) { nfs -= 3; ctx.font = `700 ${nfs}px system-ui, sans-serif`; }
+    ctx.fillText(nm, nameLeft, y);
+    // exact finish time (hundredths), right-aligned within the safe zone
+    ctx.fillStyle = i < 3 ? medals[i] : 'rgba(255,255,255,0.9)';
+    ctx.font = '800 46px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(timeStr, nameRight, y);
     ctx.globalAlpha = 1;
   }
   ctx.restore();
@@ -274,7 +285,7 @@ export function drawWinner(ctx, standings, t) {
 // turning red and pulsing under the final 5 seconds. `secsLeft` is clamped >= 0.
 export function drawRaceClock(ctx, secsLeft) {
   const s = Math.max(0, secsLeft);
-  const txt = s >= 10 ? s.toFixed(0) : s.toFixed(1);
+  const txt = s.toFixed(2); // always show hundredths (live stopwatch feel)
   const urgent = s <= 5;
   ctx.save();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -296,26 +307,12 @@ export function drawRaceClock(ctx, secsLeft) {
 // Qualifier series cards. `info` = { round, totalRounds, qualifyS, advancers:[balls],
 // eliminated:[balls], championBall }. phase 'round' between rounds, 'champion' at the end.
 const ROUND_NAMES = ['HEATS', 'SEMIS', 'FINAL'];
-export function drawQualifierCard(ctx, info, phase) {
+export function drawQualifierCard(ctx, info, phase, t = 0) {
+  if (phase === 'champion') { drawEpicChampion(ctx, info, t); return; }
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#7dd0f7'); g.addColorStop(1, '#5cb8ec');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
-  if (phase === 'champion') {
-    const p = info.championBall ? info.championBall.plugin.ball : null;
-    ctx.fillStyle = '#15151a'; ctx.font = '800 56px system-ui, sans-serif';
-    ctx.fillText('SERIES CHAMPION', W / 2, H * 0.12);
-    if (p) {
-      cardFace(ctx, p, W / 2, H * 0.36, 200);
-      ctx.fillStyle = '#15151a'; ctx.font = '900 76px system-ui, sans-serif';
-      ctx.fillText((p.name || p.label).toUpperCase(), W / 2, H * 0.58);
-      ctx.fillStyle = '#e23b3b'; ctx.font = '800 46px system-ui, sans-serif';
-      ctx.fillText('WINS THE FINAL', W / 2, H * 0.65);
-    }
-    return;
-  }
-
   // Between-round card: who advanced, and what's next.
   const justFinished = info.round;            // round number that just ran (1-based)
   const nextName = ROUND_NAMES[Math.min(justFinished, info.totalRounds - 1)];
@@ -351,4 +348,126 @@ export function drawQualifierCard(ctx, info, phase) {
     while (ctx.measureText(nm).width > cellW - 10 && fs > 18) { fs -= 2; ctx.font = `800 ${fs}px system-ui, sans-serif`; }
     ctx.fillText(nm, cx, cy + r + 26);
   });
+}
+
+// Epic series champion finale: animated sunburst, confetti, glowing portrait,
+// crown, and big titles slamming in. `t` is seconds since the card appeared.
+function drawEpicChampion(ctx, info, t) {
+  const p = info.championBall ? info.championBall.plugin.ball : null;
+  const cx = W / 2, cy = H * 0.40;
+
+  // deep radial backdrop, slowly breathing
+  const bgR = H * (0.6 + 0.03 * Math.sin(t * 1.6));
+  const bg = ctx.createRadialGradient(cx, cy, 60, cx, cy, bgR);
+  bg.addColorStop(0, '#3a2c05'); bg.addColorStop(0.5, '#1a1408'); bg.addColorStop(1, '#08060a');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // rotating golden sunburst behind the portrait
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * 0.25);
+  const rays = 24;
+  for (let i = 0; i < rays; i++) {
+    ctx.rotate((Math.PI * 2) / rays);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-70, H);
+    ctx.lineTo(70, H);
+    ctx.closePath();
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,209,77,0.10)' : 'rgba(255,209,77,0.04)';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // confetti (deterministic, time-driven)
+  const COLORS = ['#ffd34d', '#ff5d5d', '#5ad17a', '#5db8ec', '#c77dff', '#ffffff'];
+  for (let i = 0; i < 70; i++) {
+    const seedx = (i * 73) % 100 / 100, seeds = 0.6 + ((i * 37) % 50) / 100;
+    const x = ((seedx + Math.sin(i * 1.3) * 0.04) * W);
+    const fall = ((t * seeds * 320) + i * 53) % (H + 80) - 40;
+    const sway = Math.sin(t * 2 + i) * 16;
+    const size = 9 + (i % 4) * 4;
+    ctx.save();
+    ctx.translate(x + sway, fall);
+    ctx.rotate(t * 3 + i);
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(-size / 2, -size / 2, size, size * 0.6);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  if (!p) return;
+
+  // title slams down in the first 0.4s
+  const tIn = Math.min(1, t / 0.4);
+  const titleY = H * 0.13 - (1 - tIn) * 80;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.globalAlpha = tIn;
+  ctx.lineWidth = 10; ctx.strokeStyle = '#0c0a06';
+  ctx.fillStyle = '#ffd34d';
+  ctx.font = '900 92px system-ui, sans-serif';
+  ctx.strokeText('SERIES CHAMPION', cx, titleY);
+  ctx.fillText('SERIES CHAMPION', cx, titleY);
+  ctx.globalAlpha = 1;
+
+  // portrait pops in (overshoot) then gently pulses
+  const popK = Math.min(1, t / 0.5);
+  const overshoot = 1 + (1 - popK) * (1 - popK) * 1.8;
+  const pulse = 1 + 0.025 * Math.sin(t * 3.2);
+  const r = 220 * Math.min(overshoot, 1.8) * pulse;
+
+  // glow halo
+  const halo = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 1.7);
+  halo.addColorStop(0, 'rgba(255,209,77,0.55)'); halo.addColorStop(1, 'rgba(255,209,77,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.7, 0, Math.PI * 2); ctx.fill();
+
+  // thick gold ring + portrait
+  ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffd34d'; ctx.fill();
+  cardFace(ctx, p, cx, cy, r);
+
+  // crown above the head
+  drawCrown(ctx, cx, cy - r - 30, r * 0.62, t);
+
+  // name + subtitle rise in after the portrait
+  const nameK = Math.min(1, Math.max(0, (t - 0.5) / 0.4));
+  ctx.globalAlpha = nameK;
+  const nameY = cy + r + 96;
+  ctx.lineWidth = 9; ctx.strokeStyle = '#0c0a06'; ctx.fillStyle = '#ffffff';
+  let nm = (p.name || p.label).toUpperCase(), nfs = 96;
+  ctx.font = `900 ${nfs}px system-ui, sans-serif`;
+  while (ctx.measureText(nm).width > W - 90 && nfs > 44) { nfs -= 4; ctx.font = `900 ${nfs}px system-ui, sans-serif`; }
+  ctx.strokeText(nm, cx, nameY); ctx.fillText(nm, cx, nameY);
+
+  ctx.fillStyle = '#ffd34d'; ctx.font = '800 50px system-ui, sans-serif';
+  ctx.fillText('WINS THE SERIES', cx, nameY + 78);
+  if (p.crossed) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '700 40px system-ui, sans-serif';
+    ctx.fillText(`final ${(p.finishStep / 60).toFixed(2)}s`, cx, nameY + 134);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawCrown(ctx, cx, cy, w, t) {
+  const bob = Math.sin(t * 2.4) * 6;
+  const y = cy + bob, h = w * 0.7;
+  ctx.save();
+  ctx.translate(cx, y);
+  ctx.fillStyle = '#ffd34d'; ctx.strokeStyle = '#0c0a06'; ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, h / 2);
+  ctx.lineTo(-w / 2, -h * 0.1);
+  ctx.lineTo(-w * 0.25, h * 0.25);
+  ctx.lineTo(0, -h / 2);
+  ctx.lineTo(w * 0.25, h * 0.25);
+  ctx.lineTo(w / 2, -h * 0.1);
+  ctx.lineTo(w / 2, h / 2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // gems
+  ctx.fillStyle = '#ff5d5d';
+  for (const gx of [-w * 0.28, 0, w * 0.28]) { ctx.beginPath(); ctx.arc(gx, h * 0.18, w * 0.06, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
 }
