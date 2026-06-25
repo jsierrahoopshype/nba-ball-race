@@ -315,12 +315,12 @@ export function drawQualifierCard(ctx, info, phase, t = 0) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   // Between-round card: who advanced, and what's next.
   const justFinished = info.round;            // round number that just ran (1-based)
-  const nextName = ROUND_NAMES[Math.min(justFinished, info.totalRounds - 1)];
+  const nextLabel = info.finalNext ? 'THE FINAL' : `ROUND ${justFinished + 1}`;
   ctx.fillStyle = '#15151a';
   ctx.font = '900 96px system-ui, sans-serif';
-  ctx.fillText(`${ROUND_NAMES[justFinished - 1]} DONE`, W / 2, H * 0.12);
+  ctx.fillText(`ROUND ${justFinished} DONE`, W / 2, H * 0.12);
   ctx.fillStyle = '#1c7a3a'; ctx.font = '800 52px system-ui, sans-serif';
-  ctx.fillText(`${info.advancers.length} ADVANCE TO ${nextName}`, W / 2, H * 0.19);
+  ctx.fillText(`${info.advancers.length} QUALIFY FOR ${nextLabel}`, W / 2, H * 0.19);
   if (info.qualifyS) {
     ctx.fillStyle = 'rgba(21,21,26,0.7)'; ctx.font = '700 38px system-ui, sans-serif';
     ctx.fillText(`finish under ${info.qualifyS}s to qualify`, W / 2, H * 0.235);

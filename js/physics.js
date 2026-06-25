@@ -45,6 +45,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
     step: 0,
     countdownSteps: opts.countdownS ? Math.round(opts.countdownS * 60) : 0,
     tailS: opts.tailS || 0,
+    leaderBounce: opts.leaderBounce !== false,
     winner: null,         // first ball to cross the line (or lone survivor)
     finishOrder: [],      // balls in the order they finished (final standings)
     eliminatedOrder: [],  // survivor mode: balls in the order they were eliminated
@@ -105,6 +106,21 @@ export function createRace(seed, ballConfigs, opts = {}) {
   race.tick = function tick() {
     if (race.finished) return;
     race.step++;
+
+    // Leader handicap: whoever is furthest down gets +10% bounce, so a runaway
+    // leader rattles around more off the pegs and the pack can catch up. The
+    // bonus follows the lead, so it naturally encourages lead changes. Pure
+    // material change (no force on the ball), and deterministic.
+    if (race.leaderBounce) {
+      let lead = null, leadY = -Infinity;
+      for (const b of balls) {
+        const p = b.plugin.ball;
+        if (p.finished || p.eliminated) continue;
+        if (b.position.y > leadY) { leadY = b.position.y; lead = b; }
+        b.restitution = CONFIG.BALL_RESTITUTION;
+      }
+      if (lead) lead.restitution = CONFIG.LEADER_BOUNCE;
+    }
 
     for (const s of course.spinners) Matter.Body.setAngle(s, s.angle + s.plugin.spinSpeed);
     for (const m of course.movers) m.update(race.step);

@@ -321,7 +321,9 @@ function loop(now) {
     if (cardT >= CARD_S) {
       if (tournament.type === 'qualifier') {
         tournament.round++;
-        const isFinal = tournament.round >= tournament.totalRounds;
+        // The final is reached once 3 or fewer balls have qualified.
+        const isFinal = tournament.roster.length <= 3;
+        tournament.currentIsFinal = isFinal;
         startRace((tournament.baseSeed + tournament.round * 7919) >>> 0, false,
           tournament.roster, isFinal ? 0 : tournament.qualifyS, isFinal ? 1 : tournament.qScale,
           isFinal ? 45 : null);
@@ -380,12 +382,15 @@ function beginRace(seed, record = false) {
     // Scale the heat course so roughly half the field finishes under the cutoff,
     // whatever cutoff was chosen (a fixed-length course makes the cutoff useless).
     const qScale = Math.min(0.7, Math.max(0.2, qS / 100));
+    const roster = setup.toConfigs();
+    const firstIsFinal = roster.length <= 3;
     tournament = {
-      type: 'qualifier', round: 1, totalRounds: 3, qualifyS: qS, qScale,
-      roster: setup.toConfigs(), baseSeed: seed >>> 0, championId: null,
+      type: 'qualifier', round: 1, qualifyS: qS, qScale,
+      roster, baseSeed: seed >>> 0, championId: null,
       advancersBalls: [], championBall: null, lastQualified: 0,
+      currentIsFinal: firstIsFinal,
     };
-    startRace(seed, record, tournament.roster, qS, qScale);
+    startRace(seed, record, roster, firstIsFinal ? 0 : qS, firstIsFinal ? 1 : qScale, firstIsFinal ? 45 : null);
   } else {
     const format = parseInt(sv, 10) || 1;
     tournament = format > 1
@@ -404,22 +409,27 @@ function ballToConfig(p) {
   };
 }
 
-// Decide who advances from the round that just ran. Rounds 1-2: everyone who
-// crossed the line before the buzzer qualifies (always send >=2 forward so the
-// next round is a contest). Round 3 (the final): the winner is champion.
+// Decide what happens after the round that just ran. The final (no buzzer) is
+// reached once 3 or fewer balls have qualified; its winner is champion.
+// Qualifying rounds: only balls that crossed the line before the buzzer advance.
 function resolveQualifierRound() {
-  const isFinal = tournament.round >= tournament.totalRounds;
-  if (isFinal) {
+  if (tournament.currentIsFinal) {
     tournament.championBall = race.winner;
     tournament.championId = race.winner ? race.winner.plugin.ball.id : null;
     return;
   }
+  // Strict: finish in time to qualify. Safety only if literally nobody finished
+  // (otherwise the series would dead-end) -> carry the closest few forward.
   let advBalls = race.balls.filter(b => b.plugin.ball.crossed);
-  // If the cutoff caught too few to make a contest, fall back to the top half by
-  // progress so the field still narrows sensibly instead of collapsing to two.
-  if (advBalls.length < 2) {
-    const half = Math.max(2, Math.ceil(race.balls.length / 2));
-    advBalls = race.standings().slice(0, Math.min(half, race.balls.length));
+  if (advBalls.length === 0) {
+    advBalls = race.standings().slice(0, Math.min(3, race.balls.length));
+  }
+  // Hard cap on rounds so a field that never shrinks still reaches a final.
+  if (tournament.round >= 8 && advBalls.length > 3) {
+    advBalls = advBalls
+      .filter(b => b.plugin.ball.crossed)
+      .sort((a, b) => a.plugin.ball.finishStep - b.plugin.ball.finishStep)
+      .slice(0, 3);
   }
   tournament.advancersBalls = advBalls;
   tournament.lastQualified = advBalls.length;
@@ -428,7 +438,8 @@ function resolveQualifierRound() {
 
 function qualifierInfo() {
   return {
-    round: tournament.round, totalRounds: tournament.totalRounds,
+    round: tournament.round,
+    finalNext: tournament.roster.length <= 3,
     qualifyS: tournament.qualifyS, advancers: tournament.advancersBalls || [],
     championBall: tournament.championBall || race.winner,
   };
