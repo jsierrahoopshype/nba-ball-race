@@ -7,7 +7,7 @@ import { freshSeed } from './rng.js';
 import { createRace } from './physics.js';
 import { createCamera } from './camera.js';
 import { drawWorld } from './draw.js';
-import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawTournamentCard, drawRaceClock } from './hud.js';
+import { drawLeaderboard, drawCountdown, drawWinner, drawMatchup, drawTournamentCard, drawRaceClock, drawQualifierCard } from './hud.js';
 import { exportHQ, webCodecsSupported } from './hqexport.js';
 import { createRecorder } from './recorder.js';
 import { createSetup } from './setup.js';
@@ -234,18 +234,21 @@ let raceHook = '', raceMode = 'finish';
 const COUNTDOWN_BEAT = 0.5;
 const INTRO_S = 1.4;
 
-function startRace(seed, record = false) {
+function startRace(seed, record = false, configsOverride = null, countdownOverride = null, lengthScaleOverride = null) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
   const timeLimitEl = document.getElementById('time-limit');
-  const countdownS = timeLimitEl ? (parseInt(timeLimitEl.value, 10) || 0) : 0;
-  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS };
-  race = createRace(seed, setup.toConfigs(), raceOpts);
+  const uiCountdown = timeLimitEl ? (parseInt(timeLimitEl.value, 10) || 0) : 0;
+  const countdownS = countdownOverride != null ? countdownOverride : uiCountdown;
+  const lengthScale = lengthScaleOverride != null ? lengthScaleOverride : 1;
+  const configs = configsOverride || setup.toConfigs();
+  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS, lengthScale };
+  race = createRace(seed, configs, raceOpts);
   race.bg = currentBg();
   // remember exactly how this race was built so HQ export reproduces it
   race._params = {
-    seed, configs: setup.toConfigs(), opts: { ...raceOpts, bg: race.bg },
+    seed, configs, opts: { ...raceOpts, bg: race.bg },
     hook: raceHook, showIntro: !!(showIntroChk && showIntroChk.checked),
   };
   camera = createCamera(race.course.courseLength);
@@ -293,7 +296,10 @@ function loop(now) {
   } else if (mode === 'finished') {
     winnerT += dt;
     // Record the result into the series exactly once.
-    if (tournament && !tournament.championId && !winnerRecorded && race.winner) {
+    if (tournament && tournament.type === 'qualifier' && !tournament.championId && !winnerRecorded) {
+      winnerRecorded = true;
+      resolveQualifierRound();
+    } else if (tournament && !tournament.championId && !winnerRecorded && race.winner) {
       winnerRecorded = true;
       const id = race.winner.plugin.ball.id;
       tournament.wins[id] = (tournament.wins[id] || 0) + 1;
@@ -309,15 +315,24 @@ function loop(now) {
     }
   } else if (mode === 'roundcard') {
     cardT += dt;
-    drawTournamentCard(ctx, tournamentInfo(), false);
+    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'round');
+    else drawTournamentCard(ctx, tournamentInfo(), false);
     if (cardT >= CARD_S) {
-      tournament.raceNum++;
-      startRace((tournament.baseSeed + tournament.raceNum * 7919) >>> 0);
+      if (tournament.type === 'qualifier') {
+        tournament.round++;
+        const isFinal = tournament.round >= tournament.totalRounds;
+        startRace((tournament.baseSeed + tournament.round * 7919) >>> 0, false,
+          tournament.roster, isFinal ? 0 : tournament.qualifyS, isFinal ? 1 : tournament.qScale);
+      } else {
+        tournament.raceNum++;
+        startRace((tournament.baseSeed + tournament.raceNum * 7919) >>> 0);
+      }
     }
     return;
   } else if (mode === 'champion') {
-    drawTournamentCard(ctx, tournamentInfo(), true);
-    status(`series winner: race ${tournament.raceNum} of ${tournament.format}`);
+    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'champion');
+    else drawTournamentCard(ctx, tournamentInfo(), true);
+    status(tournament.type === 'qualifier' ? 'series champion crowned' : `series winner: race ${tournament.raceNum} of ${tournament.format}`);
     return;
   }
 
@@ -352,13 +367,66 @@ function tournamentInfo() {
 
 // Begin from the UI: start a single race, or kick off a tournament series.
 function beginRace(seed, record = false) {
-  const format = tournamentSelect ? parseInt(tournamentSelect.value, 10) : 1;
-  if (format > 1) {
-    tournament = { format, raceNum: 1, wins: {}, baseSeed: seed >>> 0, championId: null };
+  const sv = tournamentSelect ? tournamentSelect.value : '1';
+  if (sv === 'qual') {
+    const timeLimitEl = document.getElementById('time-limit');
+    let qS = timeLimitEl ? (parseInt(timeLimitEl.value, 10) || 0) : 0;
+    if (!qS) qS = 30; // a qualifier needs a cutoff; default to 30s if none chosen
+    // Scale the heat course so roughly half the field finishes under the cutoff,
+    // whatever cutoff was chosen (a fixed-length course makes the cutoff useless).
+    const qScale = Math.min(0.7, Math.max(0.2, qS / 100));
+    tournament = {
+      type: 'qualifier', round: 1, totalRounds: 3, qualifyS: qS, qScale,
+      roster: setup.toConfigs(), baseSeed: seed >>> 0, championId: null,
+      advancersBalls: [], championBall: null, lastQualified: 0,
+    };
+    startRace(seed, record, tournament.roster, qS, qScale);
   } else {
-    tournament = null;
+    const format = parseInt(sv, 10) || 1;
+    tournament = format > 1
+      ? { type: 'bestof', format, raceNum: 1, wins: {}, baseSeed: seed >>> 0, championId: null }
+      : null;
+    startRace(seed, record);
   }
-  startRace(seed, record);
+}
+
+// Rebuild a config from a finished ball so qualifiers can re-race next round.
+function ballToConfig(p) {
+  return {
+    id: p.id, label: p.name || p.label, name: p.name || p.label,
+    color: p.color, color2: p.color2, textColor: p.textColor,
+    image: p.image, imageFit: p.imageFit,
+  };
+}
+
+// Decide who advances from the round that just ran. Rounds 1-2: everyone who
+// crossed the line before the buzzer qualifies (always send >=2 forward so the
+// next round is a contest). Round 3 (the final): the winner is champion.
+function resolveQualifierRound() {
+  const isFinal = tournament.round >= tournament.totalRounds;
+  if (isFinal) {
+    tournament.championBall = race.winner;
+    tournament.championId = race.winner ? race.winner.plugin.ball.id : null;
+    return;
+  }
+  let advBalls = race.balls.filter(b => b.plugin.ball.crossed);
+  // If the cutoff caught too few to make a contest, fall back to the top half by
+  // progress so the field still narrows sensibly instead of collapsing to two.
+  if (advBalls.length < 2) {
+    const half = Math.max(2, Math.ceil(race.balls.length / 2));
+    advBalls = race.standings().slice(0, Math.min(half, race.balls.length));
+  }
+  tournament.advancersBalls = advBalls;
+  tournament.lastQualified = advBalls.length;
+  tournament.roster = advBalls.map(b => ballToConfig(b.plugin.ball));
+}
+
+function qualifierInfo() {
+  return {
+    round: tournament.round, totalRounds: tournament.totalRounds,
+    qualifyS: tournament.qualifyS, advancers: tournament.advancersBalls || [],
+    championBall: tournament.championBall || race.winner,
+  };
 }
 
 btnRace.addEventListener('click', () => {

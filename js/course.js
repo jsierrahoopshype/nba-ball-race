@@ -776,33 +776,38 @@ function spinnerBar(bodies, movers, y, rng) {
 // (dots with wall semicircles, ramps, chokes, bumpers, the tested movers).
 // 'classic' is the balanced default and is left exactly as it was.
 
-function layoutClassic(bodies, movers, rng, startY = 360) {
+function layoutClassic(bodies, movers, rng, startY = 360, maxY = Infinity) {
   let y = startY;
   y = fairStart(bodies, y, rng);
   scatterDots(bodies, y, 900, rng, null); y += 900; // dense field right at the top
-  y = bigDots(bodies, y, rng, 4);
-  y = chokePoint(bodies, y, rng);
-  y = baffleComb(bodies, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
-  y = turbine(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 4);
-  y = bigDots(bodies, y, rng, 4);
-  y = pendulums(bodies, movers, y, rng, 3);
-  y = baffleComb(bodies, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
-  y = spinnerBar(bodies, movers, y, rng);
-  y = chokePoint(bodies, y, rng);
-  y = bigDots(bodies, y, rng, 4);
-  y = pendulums(bodies, movers, y, rng, 3);
-  y = seesaw(bodies, movers, y, rng);
-  y = baffleComb(bodies, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
-  y = bigDots(bodies, y, rng, 4);
-  y = turbine(bodies, movers, y, rng);
-  y = bigDots(bodies, y, rng, 4);
-  y = sliders(bodies, movers, y, rng, 3);
-  y = baffleComb(bodies, y, rng, 3);
-  y = bigDots(bodies, y, rng, 4);
+  // Feature sequence as a list so a short course can stop early at maxY. With
+  // the default maxY=Infinity every step runs, so the full course is unchanged.
+  const steps = [
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => chokePoint(bodies, yy, rng),
+    (yy) => baffleComb(bodies, yy, rng, 3),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => turbine(bodies, movers, yy, rng),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => pendulums(bodies, movers, yy, rng, 3),
+    (yy) => baffleComb(bodies, yy, rng, 3),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => spinnerBar(bodies, movers, yy, rng),
+    (yy) => chokePoint(bodies, yy, rng),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => pendulums(bodies, movers, yy, rng, 3),
+    (yy) => seesaw(bodies, movers, yy, rng),
+    (yy) => baffleComb(bodies, yy, rng, 3),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => turbine(bodies, movers, yy, rng),
+    (yy) => bigDots(bodies, yy, rng, 4),
+    (yy) => sliders(bodies, movers, yy, rng, 3),
+    (yy) => baffleComb(bodies, yy, rng, 3),
+    (yy) => bigDots(bodies, yy, rng, 4),
+  ];
+  for (const step of steps) { if (y >= maxY) break; y = step(y); }
   return y;
 }
 
@@ -899,7 +904,11 @@ export function buildCourse(rng, opts = {}) {
   const layout = LAYOUTS[opts.preset] || layoutClassic;
   const bodies = [], spinnerList = [], movers = [];
   const startY = startFunnel(bodies, rng);
-  let y = layout(bodies, movers, rng, startY);
+  // Short course for qualifier heats: stop the layout early and use a shorter
+  // run-in so a whole round finishes in ~20-30s and the time cutoff is meaningful.
+  const scale = opts.lengthScale && opts.lengthScale > 0 ? opts.lengthScale : 1;
+  const maxY = scale < 1 ? startY + Math.round(23000 * scale) : Infinity;
+  let y = layout(bodies, movers, rng, startY, maxY);
 
   // Analysts spread across the whole race (not lumped before the finish),
   // bigger and isolated in their own clear bands.
@@ -907,7 +916,8 @@ export function buildCourse(rng, opts = {}) {
 
   // Dense, dramatic run-in to the finish: a packed scatter then a dot field so
   // the field bunches up and the winner isn't settled until the last moment.
-  scatterDots(bodies, y, 1300, rng, null); y += 1300;
+  const runIn = scale < 1 ? 600 : 1300;
+  scatterDots(bodies, y, runIn, rng, null); y += runIn;
   y = bigDots(bodies, y, rng, 4);
 
   // Shared hard finish for every preset: one last dense bumper scatter then a

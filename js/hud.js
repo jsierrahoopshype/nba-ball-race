@@ -17,42 +17,49 @@ function cardFace(ctx, p, cx, cy, r, rankColor) {
 
 const W = CONFIG.WORLD_W, H = CONFIG.VIEW_H;
 
-// Live Top 3, compact, pinned top-left: small face + rank + NAME, on a slim
-// translucent panel so it reads over any background without eating the corner.
+// Live full-field ranking, compact, pinned top-left: rank + small face + full
+// NAME for EVERY player on one slim translucent panel. Rows shrink when the
+// field is large so it always fits the safe zone.
 export function drawLeaderboard(ctx, standings) {
-  const top = standings.slice(0, 3);
-  const x = 28, startY = 108, rowH = 68, r = 26;
+  const n = standings.length;
+  if (!n) return;
+  const big = n > 9;
+  const rowH = big ? 34 : 44;
+  const r = big ? 13 : 16;
+  const fs = big ? 20 : 24;
+  const x = 24, startY = 96;
+  const faceX = x + 26;
+  const nameX = faceX + r * 2 + 10;
 
   ctx.save();
   ctx.textBaseline = 'middle';
-  for (let i = 0; i < top.length; i++) {
-    const p = top[i].plugin.ball;
+  ctx.font = `700 ${fs}px system-ui, sans-serif`;
+  let maxNameW = 0;
+  for (const b of standings) {
+    const nm = b.plugin.ball.name || b.plugin.ball.label;
+    maxNameW = Math.max(maxNameW, ctx.measureText(nm).width);
+  }
+  const panelW = (nameX - x) + maxNameW + 18;
+  const panelH = n * rowH + 14;
+  ctx.fillStyle = 'rgba(8,10,14,0.55)';
+  roundRect(ctx, x - 12, startY - rowH / 2 - 4, panelW, panelH, 14); ctx.fill();
+
+  for (let i = 0; i < n; i++) {
+    const p = standings[i].plugin.ball;
     const cyc = startY + i * rowH;
-    const accent = i === 0 ? '#ffd34d' : '#ffffff';
-
-    // rank number on a small dark chip
-    ctx.fillStyle = 'rgba(8,10,14,0.6)';
-    roundRect(ctx, x - 4, cyc - 20, 40, 40, 10); ctx.fill();
+    const accent = i === 0 ? '#ffd34d' : i === 1 ? '#e9e9ee' : i === 2 ? '#e0a878' : '#ffffff';
+    // rank number
     ctx.fillStyle = accent;
-    ctx.font = '800 30px system-ui, sans-serif';
+    ctx.font = `800 ${fs}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(String(i + 1), x + 16, cyc + 1);
-
+    ctx.fillText(String(i + 1), x + 2, cyc + 1);
     // face
-    const fx = x + 44;
-    cardFace(ctx, p, fx + r, cyc, r, i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.85)');
-
-    // name on its own translucent-black pill, sized to the text so even long
-    // names (e.g. Antetokounmpo) are fully covered and readable
-    const name = p.name || p.label;
-    ctx.font = '700 30px system-ui, sans-serif';
+    cardFace(ctx, p, faceX + r, cyc, r, i === 0 ? '#ffd34d' : 'rgba(255,255,255,0.7)');
+    // full name
+    ctx.font = `700 ${fs}px system-ui, sans-serif`;
     ctx.textAlign = 'left';
-    const tx = fx + r * 2 + 12;
-    const tw = ctx.measureText(name).width;
-    ctx.fillStyle = 'rgba(8,10,14,0.62)';
-    roundRect(ctx, tx - 12, cyc - 22, tw + 24, 44, 12); ctx.fill();
     ctx.fillStyle = accent;
-    ctx.fillText(name, tx, cyc + 1);
+    ctx.fillText(p.name || p.label, nameX, cyc + 1);
   }
   ctx.restore();
 }
@@ -284,4 +291,64 @@ export function drawRaceClock(ctx, secsLeft) {
   ctx.fillStyle = '#ffffff';
   ctx.fillText(txt + 's', cx, cy + 4);
   ctx.restore();
+}
+
+// Qualifier series cards. `info` = { round, totalRounds, qualifyS, advancers:[balls],
+// eliminated:[balls], championBall }. phase 'round' between rounds, 'champion' at the end.
+const ROUND_NAMES = ['HEATS', 'SEMIS', 'FINAL'];
+export function drawQualifierCard(ctx, info, phase) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#7dd0f7'); g.addColorStop(1, '#5cb8ec');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  if (phase === 'champion') {
+    const p = info.championBall ? info.championBall.plugin.ball : null;
+    ctx.fillStyle = '#15151a'; ctx.font = '800 56px system-ui, sans-serif';
+    ctx.fillText('SERIES CHAMPION', W / 2, H * 0.12);
+    if (p) {
+      cardFace(ctx, p, W / 2, H * 0.36, 200);
+      ctx.fillStyle = '#15151a'; ctx.font = '900 76px system-ui, sans-serif';
+      ctx.fillText((p.name || p.label).toUpperCase(), W / 2, H * 0.58);
+      ctx.fillStyle = '#e23b3b'; ctx.font = '800 46px system-ui, sans-serif';
+      ctx.fillText('WINS THE FINAL', W / 2, H * 0.65);
+    }
+    return;
+  }
+
+  // Between-round card: who advanced, and what's next.
+  const justFinished = info.round;            // round number that just ran (1-based)
+  const nextName = ROUND_NAMES[Math.min(justFinished, info.totalRounds - 1)];
+  ctx.fillStyle = '#15151a';
+  ctx.font = '900 96px system-ui, sans-serif';
+  ctx.fillText(`${ROUND_NAMES[justFinished - 1]} DONE`, W / 2, H * 0.12);
+  ctx.fillStyle = '#1c7a3a'; ctx.font = '800 52px system-ui, sans-serif';
+  ctx.fillText(`${info.advancers.length} ADVANCE TO ${nextName}`, W / 2, H * 0.19);
+  if (info.qualifyS) {
+    ctx.fillStyle = 'rgba(21,21,26,0.7)'; ctx.font = '700 38px system-ui, sans-serif';
+    ctx.fillText(`finish under ${info.qualifyS}s to qualify`, W / 2, H * 0.235);
+  }
+
+  // Advancers grid of faces.
+  const adv = info.advancers;
+  const cols = adv.length <= 6 ? Math.min(3, adv.length) : 4;
+  const rows = Math.ceil(adv.length / cols);
+  const cellW = Math.min(280, (W - 120) / cols);
+  const r = Math.min(86, cellW * 0.32);
+  const gridY = H * 0.32;
+  const cellH = r * 2 + 64;
+  adv.forEach((ball, i) => {
+    const p = ball.plugin.ball;
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx = W / 2 + (col - (cols - 1) / 2) * cellW;
+    const cy = gridY + row * cellH;
+    cardFace(ctx, p, cx, cy, r, '#1c7a3a');
+    ctx.fillStyle = '#15151a'; ctx.font = `800 ${Math.round(r * 0.42)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    const nm = (p.name || p.label).toUpperCase();
+    let fs = Math.round(r * 0.42);
+    ctx.font = `800 ${fs}px system-ui, sans-serif`;
+    while (ctx.measureText(nm).width > cellW - 10 && fs > 18) { fs -= 2; ctx.font = `800 ${fs}px system-ui, sans-serif`; }
+    ctx.fillText(nm, cx, cy + r + 26);
+  });
 }

@@ -21,7 +21,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
   engine.positionIterations = 18;
   engine.velocityIterations = 12;
 
-  const course = buildCourse(rng, { mode, preset: opts.preset, analysts: opts.analysts, ballR: ballRadiusForCount(ballConfigs.length) });
+  const course = buildCourse(rng, { mode, preset: opts.preset, analysts: opts.analysts, ballR: ballRadiusForCount(ballConfigs.length), lengthScale: opts.lengthScale });
   const balls = makeBalls(ballConfigs, rng);
   Matter.Composite.add(engine.world, [...course.bodies, ...balls]);
 
@@ -81,10 +81,11 @@ export function createRace(seed, ballConfigs, opts = {}) {
     }
   }
 
-  function placeFinish(ball) {
+  function placeFinish(ball, crossed = false) {
     const p = ball.plugin.ball;
     if (p.finished || p.eliminated) return;
     p.finished = true;
+    p.crossed = crossed; // true only when the ball actually reached the finish line
     p.finishStep = race.step;
     p.place = race.finishOrder.length + 1;
     race.finishOrder.push(ball);
@@ -136,7 +137,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
       // course, not with a force here.
 
       // Finish line
-      if (ball.position.y >= course.finishY) placeFinish(ball);
+      if (ball.position.y >= course.finishY) placeFinish(ball, true);
     }
 
     // Remove eliminated balls from the world so they vanish (after the loop).
@@ -149,12 +150,14 @@ export function createRace(seed, ballConfigs, opts = {}) {
     }
 
     // Tail timeout: once a winner is in, don't wait forever on stragglers.
-    if (race.winner) {
+    // Skipped in countdown mode, where the buzzer is the real cutoff and every
+    // ball must get the full clock to finish (and qualify).
+    if (race.winner && !race.countdownSteps) {
       const tail = race.step - race.winner.plugin.ball.finishStep;
       if (tail > CONFIG.TAIL_S * 60) {
         [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
           .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
-          .forEach(placeFinish);
+          .forEach(b => placeFinish(b));
       }
     }
 
@@ -162,7 +165,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
     if (race.step > CONFIG.HARD_TIMEOUT_S * 60) {
       [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
         .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
-        .forEach(placeFinish);
+        .forEach(b => placeFinish(b));
     }
 
     // Countdown mode: a hard time limit. At the buzzer, freeze and rank everyone
@@ -172,7 +175,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
     if (race.countdownSteps && race.step >= race.countdownSteps) {
       [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
         .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
-        .forEach(placeFinish);
+        .forEach(b => placeFinish(b));
     }
 
     // Race ends when every ball is terminal (finished or eliminated).
