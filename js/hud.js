@@ -309,44 +309,79 @@ export function drawRaceClock(ctx, secsLeft) {
 const ROUND_NAMES = ['HEATS', 'SEMIS', 'FINAL'];
 export function drawQualifierCard(ctx, info, phase, t = 0) {
   if (phase === 'champion') { drawEpicChampion(ctx, info, t); return; }
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#7dd0f7'); g.addColorStop(1, '#5cb8ec');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  // Between-round card: who advanced, and what's next.
-  const justFinished = info.round;            // round number that just ran (1-based)
-  const nextLabel = info.finalNext ? 'THE FINAL' : `ROUND ${justFinished + 1}`;
-  ctx.fillStyle = '#15151a';
-  ctx.font = '900 96px system-ui, sans-serif';
-  ctx.fillText(`ROUND ${justFinished} DONE`, W / 2, H * 0.12);
-  ctx.fillStyle = '#1c7a3a'; ctx.font = '800 52px system-ui, sans-serif';
-  ctx.fillText(`${info.advancers.length} QUALIFY FOR ${nextLabel}`, W / 2, H * 0.19);
-  if (info.qualifyS) {
-    ctx.fillStyle = 'rgba(21,21,26,0.7)'; ctx.font = '700 38px system-ui, sans-serif';
-    ctx.fillText(`finish under ${info.qualifyS}s to qualify`, W / 2, H * 0.235);
-  }
+  drawRoundCard(ctx, info, t);
+}
 
-  // Advancers grid of faces.
+// Epic between-round reveal: dark broadcast backdrop, a slam-in headline, and the
+// qualifiers' headshots popping in one by one with a glowing ring. `t` is seconds
+// since the card appeared.
+function drawRoundCard(ctx, info, t) {
+  const justFinished = info.round;
+  const finalNext = info.finalNext;
+  const nextLabel = finalNext ? 'THE FINAL' : `ROUND ${justFinished + 1}`;
+
+  // moody backdrop with a slow sweeping glow
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0b1530'); bg.addColorStop(0.5, '#102449'); bg.addColorStop(1, '#0a1124');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  const gx = W * (0.5 + 0.35 * Math.sin(t * 0.8));
+  const glow = ctx.createRadialGradient(gx, H * 0.34, 80, gx, H * 0.34, H * 0.5);
+  glow.addColorStop(0, 'rgba(60,150,240,0.22)'); glow.addColorStop(1, 'rgba(60,150,240,0)');
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  // headline slams down
+  const tIn = Math.min(1, t / 0.35);
+  const titleY = H * 0.115 - (1 - tIn) * 70;
+  ctx.globalAlpha = tIn;
+  ctx.lineWidth = 9; ctx.strokeStyle = '#060c1c';
+  ctx.fillStyle = '#ffffff'; ctx.font = '900 92px system-ui, sans-serif';
+  ctx.strokeText(`ROUND ${justFinished} DONE`, W / 2, titleY);
+  ctx.fillText(`ROUND ${justFinished} DONE`, W / 2, titleY);
+
+  // advance line, in electric green/gold depending on whether the final is next
+  const accent = finalNext ? '#ffd34d' : '#41e08a';
+  ctx.fillStyle = accent; ctx.font = '900 60px system-ui, sans-serif';
+  ctx.fillText(`${info.advancers.length} QUALIFY`, W / 2, H * 0.185);
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '800 44px system-ui, sans-serif';
+  ctx.fillText(`NEXT: ${nextLabel}`, W / 2, H * 0.232);
+  if (info.qualifyS && !finalNext) {
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '700 34px system-ui, sans-serif';
+    ctx.fillText(`finish under ${info.qualifyS}s to qualify`, W / 2, H * 0.272);
+  }
+  ctx.globalAlpha = 1;
+
+  // qualifiers pop in one by one
   const adv = info.advancers;
   const cols = adv.length <= 6 ? Math.min(3, adv.length) : 4;
-  const rows = Math.ceil(adv.length / cols);
   const cellW = Math.min(280, (W - 120) / cols);
-  const r = Math.min(86, cellW * 0.32);
-  const gridY = H * 0.32;
-  const cellH = r * 2 + 64;
+  const r = Math.min(92, cellW * 0.34);
+  const gridY = H * 0.40;
+  const cellH = r * 2 + 70;
   adv.forEach((ball, i) => {
     const p = ball.plugin.ball;
     const col = i % cols, row = Math.floor(i / cols);
     const cx = W / 2 + (col - (cols - 1) / 2) * cellW;
     const cy = gridY + row * cellH;
-    cardFace(ctx, p, cx, cy, r, '#1c7a3a');
-    ctx.fillStyle = '#15151a'; ctx.font = `800 ${Math.round(r * 0.42)}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
+    // staggered pop-in with a little overshoot
+    const k = Math.min(1, Math.max(0, (t - 0.3 - i * 0.12) / 0.32));
+    if (k <= 0) return;
+    const scale = k < 1 ? 1 + (1 - k) * (1 - k) * 0.9 : 1;
+    const rr = r * Math.min(scale, 1.6);
+    ctx.globalAlpha = k;
+    // glow ring
+    const halo = ctx.createRadialGradient(cx, cy, rr * 0.7, cx, cy, rr * 1.5);
+    halo.addColorStop(0, finalNext ? 'rgba(255,211,77,0.5)' : 'rgba(65,224,138,0.45)');
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, rr * 1.5, 0, Math.PI * 2); ctx.fill();
+    cardFace(ctx, p, cx, cy, rr, accent);
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
     const nm = (p.name || p.label).toUpperCase();
-    let fs = Math.round(r * 0.42);
-    ctx.font = `800 ${fs}px system-ui, sans-serif`;
-    while (ctx.measureText(nm).width > cellW - 10 && fs > 18) { fs -= 2; ctx.font = `800 ${fs}px system-ui, sans-serif`; }
-    ctx.fillText(nm, cx, cy + r + 26);
+    let fs = Math.round(r * 0.4); ctx.font = `800 ${fs}px system-ui, sans-serif`;
+    while (ctx.measureText(nm).width > cellW - 8 && fs > 16) { fs -= 2; ctx.font = `800 ${fs}px system-ui, sans-serif`; }
+    ctx.fillText(nm, cx, cy + r + 30);
+    ctx.globalAlpha = 1;
   });
 }
 

@@ -45,6 +45,7 @@ export function createRace(seed, ballConfigs, opts = {}) {
     step: 0,
     countdownSteps: opts.countdownS ? Math.round(opts.countdownS * 60) : 0,
     tailS: opts.tailS || 0,
+    suddenDeath: !!opts.suddenDeath,
     leaderBounce: opts.leaderBounce !== false,
     winner: null,         // first ball to cross the line (or lone survivor)
     finishOrder: [],      // balls in the order they finished (final standings)
@@ -164,6 +165,14 @@ export function createRace(seed, ballConfigs, opts = {}) {
     if (mode === 'survivor' && race.eliminatedOrder.length) {
       const alive = balls.filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated);
       if (alive.length === 1) placeFinish(alive[0]);
+    }
+
+    // Sudden death (series final): the instant the first ball crosses the line,
+    // the race is over. Everyone still running is placed by how far they got.
+    if (race.suddenDeath && race.winner) {
+      [...balls].filter(b => !b.plugin.ball.finished && !b.plugin.ball.eliminated)
+        .sort((a, b) => b.plugin.ball.bestY - a.plugin.ball.bestY)
+        .forEach(b => placeFinish(b));
     }
 
     // Tail timeout: once a winner is in, don't wait forever on stragglers.

@@ -234,7 +234,7 @@ let raceHook = '', raceMode = 'finish';
 const COUNTDOWN_BEAT = 0.5;
 const INTRO_S = 1.4;
 
-function startRace(seed, record = false, configsOverride = null, countdownOverride = null, lengthScaleOverride = null, tailSOverride = null) {
+function startRace(seed, record = false, configsOverride = null, countdownOverride = null, lengthScaleOverride = null, tailSOverride = null, suddenDeathOverride = false) {
   raceMode = winModeSelect.value === 'survivor' ? 'survivor' : 'finish';
   raceHook = hookInput.value || '';
   const racePreset = coursePresetSelect ? coursePresetSelect.value : 'classic';
@@ -244,7 +244,8 @@ function startRace(seed, record = false, configsOverride = null, countdownOverri
   const lengthScale = lengthScaleOverride != null ? lengthScaleOverride : 1;
   const tailS = tailSOverride != null ? tailSOverride : 0;
   const configs = configsOverride || setup.toConfigs();
-  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS, lengthScale, tailS };
+  const suddenDeath = !!suddenDeathOverride;
+  const raceOpts = { mode: raceMode, preset: racePreset, analysts: buildAnalystsForRace(), bias: currentBias(), countdownS, lengthScale, tailS, suddenDeath };
   race = createRace(seed, configs, raceOpts);
   race.bg = currentBg();
   // remember exactly how this race was built so HQ export reproduces it
@@ -318,7 +319,7 @@ function loop(now) {
     }
   } else if (mode === 'roundcard') {
     cardT += dt;
-    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'round');
+    if (tournament.type === 'qualifier') drawQualifierCard(ctx, qualifierInfo(), 'round', cardT);
     else drawTournamentCard(ctx, tournamentInfo(), false);
     if (cardT >= CARD_S) {
       if (tournament.type === 'qualifier') {
@@ -326,9 +327,10 @@ function loop(now) {
         // The final is reached once 3 or fewer balls have qualified.
         const isFinal = tournament.roster.length <= 3;
         tournament.currentIsFinal = isFinal;
+        // Final: countdown clock + sudden death (first ball across wins). Same
+        // scaled course/buzzer as a heat so a finish lands within the clock.
         startRace((tournament.baseSeed + tournament.round * 7919) >>> 0, false,
-          tournament.roster, isFinal ? 0 : tournament.qualifyS, isFinal ? 1 : tournament.qScale,
-          isFinal ? 45 : null);
+          tournament.roster, tournament.qualifyS, tournament.qScale, null, isFinal);
       } else {
         tournament.raceNum++;
         startRace((tournament.baseSeed + tournament.raceNum * 7919) >>> 0);
@@ -397,7 +399,10 @@ function beginRace(seed, record = false) {
       advancersBalls: [], championBall: null, lastQualified: 0,
       currentIsFinal: firstIsFinal,
     };
-    startRace(seed, record, roster, firstIsFinal ? 0 : qS, firstIsFinal ? 1 : qScale, firstIsFinal ? 45 : null);
+    // The final has a countdown clock and is sudden death (first to cross wins).
+    // It uses the same scaled course + buzzer as a heat so a cross lands inside
+    // the clock.
+    startRace(seed, record, roster, qS, qScale, null, firstIsFinal);
   } else {
     const format = parseInt(sv, 10) || 1;
     tournament = format > 1

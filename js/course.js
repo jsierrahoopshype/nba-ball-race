@@ -68,7 +68,7 @@ function edgePosts(bodies, yTop, yBot, rng) {
 // around a central feature. Fills the side margins so balls can't free-fall the
 // edge, while the skip-zone keeps dots off the feature so no pocket forms. Round
 // + wide-spaced (gap ~119px > ball) so balls pass through, nothing wedges.
-function scatterDots(bodies, y, h, rng, skip) {
+function scatterDots(bodies, y, h, rng, skip, rest = 0.6) {
   const R = 58, semiR = 84;
   // ball-aware edge + wall semicircles fill the wall corner so a small ball
   // can't drop into the wall channel and wedge against the first dot.
@@ -80,7 +80,7 @@ function scatterDots(bodies, y, h, rng, skip) {
     const off = (row % 2) ? sx / 2 : 0;
     for (let x = edge + off; x <= W - edge; x += sx) {
       if (skip && skip(x, yy)) continue;
-      bodies.push(peg(x + rng.range(-6, 6), yy, R, { restitution: 0.6 }));
+      bodies.push(peg(x + rng.range(-6, 6), yy, R, { restitution: rest }));
     }
     const L = wallSemi('L', yy, semiR); if (L) bodies.push(L);
     const Rr = wallSemi('R', yy, semiR); if (Rr) bodies.push(Rr);
@@ -174,7 +174,7 @@ function fairStart(bodies, y, rng) {
   return y + 120 + rows * sy + 80;
 }
 
-function bigDots(bodies, y, rng, rows = 4) {
+function bigDots(bodies, y, rng, rows = 4, rest = 0.6) {
   const R = 72, semiR = 84;
   const sx = 2 * R + Math.round(2.9 * curBallR);
   const sy = Math.round(2 * R + 1.6 * curBallR);
@@ -185,7 +185,7 @@ function bigDots(bodies, y, rng, rows = 4) {
     const ry = y + 70 + r * sy;
     const off = (r % 2) ? sx / 2 : 0;
     for (let x = edge + off; x <= W - edge; x += sx) {
-      bodies.push(peg(x + rng.range(-8, 8), ry, R, { restitution: 0.6 }));
+      bodies.push(peg(x + rng.range(-8, 8), ry, R, { restitution: rest }));
     }
     const L = wallSemi('L', ry, semiR); if (L) bodies.push(L);
     const Rr = wallSemi('R', ry, semiR); if (Rr) bodies.push(Rr);
@@ -932,8 +932,11 @@ export function buildCourse(rng, opts = {}) {
   // Dense, dramatic run-in to the finish: a packed scatter then a dot field so
   // the field bunches up and the winner isn't settled until the last moment.
   const runIn = scale < 1 ? 600 : 1300;
-  scatterDots(bodies, y, runIn, rng, null); y += runIn;
-  y = bigDots(bodies, y, rng, 4);
+  // The finish plinko is 40% bouncier than the rest of the course, so the run-in
+  // to the line is extra chaotic and the order keeps changing late.
+  const FINISH_REST = 0.84; // 0.6 * 1.4
+  scatterDots(bodies, y, runIn, rng, null, FINISH_REST); y += runIn;
+  y = bigDots(bodies, y, rng, 4, FINISH_REST);
 
   // Shared hard finish for every preset: one last dense bumper scatter then a
   // narrow funnel gate. No free-fall to the line; the goal is a tight bottleneck.
