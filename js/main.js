@@ -258,13 +258,13 @@ function startRace(seed, record = false, configsOverride = null, countdownOverri
   mode = 'countdown'; // no intro card: go straight to the WHO WINS? countdown
   introT = 0; countdownT = 0; winnerT = 0; accumulator = 0; lastTime = null;
   winnerRecorded = false; cardT = 0;
-  downloadFired = false; recordingThisRace = record;
+  downloadFired = false;
   seedInput.value = String(seed);
   btnReplay.disabled = false;
   if (record) {
-    try { recorder.start(); status(`● REC | seed ${seed}`); }
+    try { recorder.start(); recordingThisRace = true; status(`● REC | seed ${seed}`); }
     catch (e) { recordingThisRace = false; status(`record failed: ${e.message}`); }
-  } else {
+  } else if (!recordingThisRace) {
     status(`seed ${seed}`);
   }
 }
@@ -310,7 +310,9 @@ function loop(now) {
       }
     }
     if (winnerT > 3.2) {
-      finishRecording();
+      // A single race ends here. A series keeps recording through every round and
+      // only stops after the champion finale (handled in champion mode).
+      if (!tournament) finishRecording();
       if (tournament && !tournament.championId) { mode = 'roundcard'; cardT = 0; }
       else if (tournament && tournament.championId) { mode = 'champion'; cardT = 0; }
     }
@@ -339,6 +341,8 @@ function loop(now) {
       ? (tournament.championBall || race.winner)
       : (race.balls.find(b => b.plugin.ball.id === tournament.championId) || race.winner);
     drawQualifierCard(ctx, { championBall: champBall }, 'champion', cardT);
+    // Record through the finale, then stop and save the whole-series clip.
+    if (cardT > 6) finishRecording();
     status('series champion crowned');
     return;
   }
@@ -374,6 +378,9 @@ function tournamentInfo() {
 
 // Begin from the UI: start a single race, or kick off a tournament series.
 function beginRace(seed, record = false) {
+  // A fresh race/series: clear any prior recording state. For a series, recording
+  // (when requested) spans every round through the champion finale.
+  recordingThisRace = false; downloadFired = false;
   const sv = tournamentSelect ? tournamentSelect.value : '1';
   if (sv === 'qual') {
     const timeLimitEl = document.getElementById('time-limit');
@@ -418,19 +425,15 @@ function resolveQualifierRound() {
     tournament.championId = race.winner ? race.winner.plugin.ball.id : null;
     return;
   }
-  // Strict: finish in time to qualify. Safety only if literally nobody finished
-  // (otherwise the series would dead-end) -> carry the closest few forward.
-  let advBalls = race.balls.filter(b => b.plugin.ball.crossed);
-  if (advBalls.length === 0) {
-    advBalls = race.standings().slice(0, Math.min(3, race.balls.length));
-  }
-  // Hard cap on rounds so a field that never shrinks still reaches a final.
-  if (tournament.round >= 8 && advBalls.length > 3) {
-    advBalls = advBalls
-      .filter(b => b.plugin.ball.crossed)
-      .sort((a, b) => a.plugin.ball.finishStep - b.plugin.ball.finishStep)
-      .slice(0, 3);
-  }
+  // Qualify = finish before the buzzer. At most HALF the field advances each
+  // round (the fastest finishers), even if everyone makes the time.
+  const crossed = race.balls.filter(b => b.plugin.ball.crossed)
+    .sort((a, b) => a.plugin.ball.finishStep - b.plugin.ball.finishStep);
+  const cap = Math.floor(race.balls.length / 2);
+  let advBalls = crossed.slice(0, cap);
+  // Safety: if nobody finished in time, carry the closest few so the series
+  // can't dead-end.
+  if (advBalls.length === 0) advBalls = race.standings().slice(0, Math.min(Math.max(cap, 1), 3));
   tournament.advancersBalls = advBalls;
   tournament.lastQualified = advBalls.length;
   tournament.roster = advBalls.map(b => ballToConfig(b.plugin.ball));
