@@ -120,7 +120,13 @@ export function createRace(seed, ballConfigs, opts = {}) {
         if (b.position.y > leadY) { leadY = b.position.y; lead = b; }
         b.restitution = CONFIG.BALL_RESTITUTION;
       }
-      if (lead) lead.restitution = CONFIG.LEADER_BOUNCE;
+      if (lead) {
+        // 10% bouncier than whatever the rest get on this part of the course: a
+        // higher value inside the bouncier finish plinko so the bonus still bites
+        // there.
+        const inFinish = course.finishZoneY && lead.position.y > course.finishZoneY;
+        lead.restitution = inFinish ? CONFIG.LEADER_BOUNCE_FINISH : CONFIG.LEADER_BOUNCE;
+      }
     }
 
     for (const s of course.spinners) Matter.Body.setAngle(s, s.angle + s.plugin.spinSpeed);

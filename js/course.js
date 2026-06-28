@@ -935,6 +935,7 @@ export function buildCourse(rng, opts = {}) {
   // The finish plinko is 40% bouncier than the rest of the course, so the run-in
   // to the line is extra chaotic and the order keeps changing late.
   const FINISH_REST = 0.84; // 0.6 * 1.4
+  const finishZoneY = y; // from here on the plinko is bouncier (the "finish" zone)
   scatterDots(bodies, y, runIn, rng, null, FINISH_REST); y += runIn;
   y = bigDots(bodies, y, rng, 4, FINISH_REST);
 
@@ -978,5 +979,5 @@ export function buildCourse(rng, opts = {}) {
     }
   }
 
-  return { bodies, spinners: spinnerList, movers, finishY, courseLength, clouds, eliminators, analysts, mode };
+  return { bodies, spinners: spinnerList, movers, finishY, finishZoneY, courseLength, clouds, eliminators, analysts, mode };
 }

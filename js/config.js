@@ -12,7 +12,8 @@ export const CONFIG = {
   GRAVITY_Y: 1.05,
   BALL_RADIUS: 54,        // base; actual radius scales with ball count (see balls.js)
   BALL_RESTITUTION: 0.46,   // 20% bouncier balls
-  LEADER_BOUNCE: 0.66,      // +10% bounce for the current leader (anti-runaway)
+  LEADER_BOUNCE: 0.726,     // leader bounce on the normal course (was 0.66, +10%)
+  LEADER_BOUNCE_FINISH: 0.924, // leader bounce in the 0.84 finish plinko (+10% over it)
   BALL_FRICTION: 0.001,    // marble glides
   BALL_AIR_FRICTION: 0.0034,  // calmer descent
   MAX_SPEED: 30,           // lower top speed: calmer motion, no tunneling
