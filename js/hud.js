@@ -312,78 +312,128 @@ export function drawQualifierCard(ctx, info, phase, t = 0) {
   drawRoundCard(ctx, info, t);
 }
 
-// Epic between-round reveal: dark broadcast backdrop, a slam-in headline, and the
-// qualifiers' headshots popping in one by one with a glowing ring. `t` is seconds
-// since the card appeared.
+// Epic between-round reveal: animated broadcast intro. Rotating light rays, a
+// sweeping highlight, rising energy particles, a slam-in gradient headline, and
+// the qualifiers flying up one by one with an overshoot and a landing flash.
+// `t` is seconds since the card appeared.
 function drawRoundCard(ctx, info, t) {
   const justFinished = info.round;
   const finalNext = info.finalNext;
+  const accent = finalNext ? '#ffd34d' : '#3ee07f';
+  const accentRGB = finalNext ? '255,211,77' : '62,224,127';
   const nextLabel = finalNext ? 'THE FINAL' : `ROUND ${justFinished + 1}`;
+  const fit = (txt, max, weight = 900) => { let fs = 100; ctx.font = `${weight} ${fs}px system-ui, sans-serif`; while (ctx.measureText(txt).width > max && fs > 24) { fs -= 2; ctx.font = `${weight} ${fs}px system-ui, sans-serif`; } return fs; };
 
-  // moody backdrop with a slow sweeping glow
+  // backdrop
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#0b1530'); bg.addColorStop(0.5, '#102449'); bg.addColorStop(1, '#0a1124');
+  bg.addColorStop(0, '#0a1226'); bg.addColorStop(0.5, '#0e1c3c'); bg.addColorStop(1, '#070d1c');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  const gx = W * (0.5 + 0.35 * Math.sin(t * 0.8));
-  const glow = ctx.createRadialGradient(gx, H * 0.34, 80, gx, H * 0.34, H * 0.5);
-  glow.addColorStop(0, 'rgba(60,150,240,0.22)'); glow.addColorStop(1, 'rgba(60,150,240,0)');
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
 
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // rotating sunburst rays
+  ctx.save(); ctx.translate(W / 2, H * 0.32); ctx.rotate(t * 0.15);
+  for (let i = 0; i < 22; i++) {
+    ctx.rotate((Math.PI * 2) / 22);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-100, H * 1.4); ctx.lineTo(100, H * 1.4); ctx.closePath();
+    ctx.fillStyle = `rgba(${accentRGB},${i % 2 ? 0.05 : 0.02})`; ctx.fill();
+  }
+  ctx.restore();
 
-  // headline slams down
-  const tIn = Math.min(1, t / 0.35);
-  const titleY = H * 0.115 - (1 - tIn) * 70;
-  ctx.globalAlpha = tIn;
-  ctx.lineWidth = 9; ctx.strokeStyle = '#060c1c';
-  ctx.fillStyle = '#ffffff'; ctx.font = '900 92px system-ui, sans-serif';
-  ctx.strokeText(`ROUND ${justFinished} DONE`, W / 2, titleY);
-  ctx.fillText(`ROUND ${justFinished} DONE`, W / 2, titleY);
+  // sweeping highlight bar
+  const sweepX = ((t * 0.4) % 1.4) * W - W * 0.2;
+  const sw = ctx.createLinearGradient(sweepX - 200, 0, sweepX + 200, 0);
+  sw.addColorStop(0, 'rgba(120,180,255,0)'); sw.addColorStop(0.5, 'rgba(140,190,255,0.08)'); sw.addColorStop(1, 'rgba(120,180,255,0)');
+  ctx.fillStyle = sw; ctx.fillRect(0, 0, W, H);
 
-  // advance line, in electric green/gold depending on whether the final is next
-  const accent = finalNext ? '#ffd34d' : '#41e08a';
-  ctx.fillStyle = accent; ctx.font = '900 60px system-ui, sans-serif';
-  ctx.fillText(`${info.advancers.length} QUALIFY`, W / 2, H * 0.185);
-  ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '800 44px system-ui, sans-serif';
-  ctx.fillText(`NEXT: ${nextLabel}`, W / 2, H * 0.232);
-  if (info.qualifyS && !finalNext) {
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '700 34px system-ui, sans-serif';
-    ctx.fillText(`finish under ${info.qualifyS}s to qualify`, W / 2, H * 0.272);
+  // rising energy particles
+  for (let i = 0; i < 44; i++) {
+    const sx = ((i * 61) % 100) / 100 * W;
+    const rise = H - ((t * 130 * (0.5 + (i % 5) / 5) + i * 47) % (H + 60));
+    const sway = Math.sin(t * 1.5 + i) * 16;
+    ctx.globalAlpha = Math.max(0, 0.5 * (1 - Math.abs(rise / H - 0.4) * 1.8)) * 0.7;
+    ctx.fillStyle = accent; const s = 3 + (i % 3) * 3;
+    ctx.beginPath(); ctx.arc(sx + sway, rise, s, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  // qualifiers pop in one by one
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  // headline slam-in with gradient + sweep flash
+  const tIn = Math.min(1, t / 0.35);
+  const over = 1 + (1 - tIn) * (1 - tIn) * 0.5;
+  const titleY = H * 0.115 - (1 - tIn) * 70;
+  const title = `ROUND ${justFinished} COMPLETE`;
+  const tfs = fit(title, W - 70);
+  ctx.save();
+  ctx.globalAlpha = tIn; ctx.translate(W / 2, titleY); ctx.scale(over, over);
+  ctx.lineWidth = 12; ctx.strokeStyle = '#050a18';
+  ctx.font = `900 ${tfs}px system-ui, sans-serif`;
+  ctx.strokeText(title, 0, 0);
+  const tg = ctx.createLinearGradient(0, -tfs / 2, 0, tfs / 2);
+  tg.addColorStop(0, '#ffffff'); tg.addColorStop(1, '#bcd4ff');
+  ctx.fillStyle = tg; ctx.fillText(title, 0, 0);
+  ctx.restore();
+
+  // "X QUALIFY" with glow + NEXT line
+  const subA = Math.min(1, Math.max(0, (t - 0.2) / 0.3));
+  ctx.globalAlpha = subA;
+  ctx.shadowColor = accent; ctx.shadowBlur = 28;
+  ctx.fillStyle = accent; ctx.font = '900 76px system-ui, sans-serif';
+  ctx.fillText(`${info.advancers.length} QUALIFY`, W / 2, H * 0.185);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.font = '800 48px system-ui, sans-serif';
+  ctx.fillText(`NEXT: ${nextLabel}`, W / 2, H * 0.232);
+  if (info.qualifyS && !finalNext) {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '700 32px system-ui, sans-serif';
+    ctx.fillText(`top half only \u2022 finish under ${info.qualifyS}s`, W / 2, H * 0.272);
+  }
+  ctx.globalAlpha = 1;
+
+  // qualifiers fly up one by one with overshoot + landing flash
   const adv = info.advancers;
   const cols = adv.length <= 6 ? Math.min(3, adv.length) : 4;
-  const cellW = Math.min(280, (W - 120) / cols);
-  const r = Math.min(92, cellW * 0.34);
-  const gridY = H * 0.40;
-  const cellH = r * 2 + 70;
+  const r = adv.length <= 3 ? 116 : adv.length <= 6 ? 96 : 80;
+  const cellW = Math.min(300, (W - 90) / cols);
+  const gridY = H * 0.42;
+  const cellH = r * 2 + 78;
   adv.forEach((ball, i) => {
     const p = ball.plugin.ball;
     const col = i % cols, row = Math.floor(i / cols);
     const cx = W / 2 + (col - (cols - 1) / 2) * cellW;
-    const cy = gridY + row * cellH;
-    // staggered pop-in with a little overshoot
-    const k = Math.min(1, Math.max(0, (t - 0.3 - i * 0.12) / 0.32));
+    const cyF = gridY + row * cellH;
+    const k = Math.min(1, Math.max(0, (t - 0.5 - i * 0.13) / 0.42));
     if (k <= 0) return;
-    const scale = k < 1 ? 1 + (1 - k) * (1 - k) * 0.9 : 1;
-    const rr = r * Math.min(scale, 1.6);
-    ctx.globalAlpha = k;
-    // glow ring
-    const halo = ctx.createRadialGradient(cx, cy, rr * 0.7, cx, cy, rr * 1.5);
-    halo.addColorStop(0, finalNext ? 'rgba(255,211,77,0.5)' : 'rgba(65,224,138,0.45)');
-    halo.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, rr * 1.5, 0, Math.PI * 2); ctx.fill();
+    const ease = 1 - Math.pow(1 - k, 3);
+    const cy = cyF + (1 - ease) * 240;
+    const pop = k < 1 ? 1 + (1 - k) * 0.45 : 1;
+    const rr = r * pop;
+    ctx.globalAlpha = Math.min(1, k * 1.4);
+    // glow halo
+    const halo = ctx.createRadialGradient(cx, cy, rr * 0.7, cx, cy, rr * 1.7);
+    halo.addColorStop(0, `rgba(${accentRGB},0.55)`); halo.addColorStop(1, `rgba(${accentRGB},0)`);
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, rr * 1.7, 0, Math.PI * 2); ctx.fill();
     cardFace(ctx, p, cx, cy, rr, accent);
-    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+    // landing flash
+    if (k > 0.82 && k < 1) {
+      ctx.globalAlpha = (1 - k) / 0.18;
+      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+      ctx.globalAlpha = Math.min(1, k * 1.4);
+    }
+    // name pill
     const nm = (p.name || p.label).toUpperCase();
-    let fs = Math.round(r * 0.4); ctx.font = `800 ${fs}px system-ui, sans-serif`;
-    while (ctx.measureText(nm).width > cellW - 8 && fs > 16) { fs -= 2; ctx.font = `800 ${fs}px system-ui, sans-serif`; }
-    ctx.fillText(nm, cx, cy + r + 30);
+    const nfs = fit(nm, cellW - 24, 800);
+    const tw = ctx.measureText(nm).width;
+    const py = cy + r + 34, ph = nfs + 18, pw = tw + 34;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    roundRect(ctx, cx - pw / 2, py - ph / 2, pw, ph, ph / 2); ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = accent;
+    roundRect(ctx, cx - pw / 2, py - ph / 2, pw, ph, ph / 2); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = `800 ${nfs}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(nm, cx, py);
     ctx.globalAlpha = 1;
   });
 }
+
 
 // Epic series champion finale: animated sunburst, confetti, glowing portrait,
 // crown, and big titles slamming in. `t` is seconds since the card appeared.

@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA Ball Race</title>
-<link rel="stylesheet" href="css/editor.css?v=53">
+<link rel="stylesheet" href="css/editor.css?v=54">
 </head>
 <body>
   <main class="stage">
     <header class="topbar">
-      <h1>NBA BALL RACE <span class="phase">PHASE 2.51</span></h1>
+      <h1>NBA BALL RACE <span class="phase">PHASE 2.52</span></h1>
       <div class="controls">
         <label class="seed-field">seed
           <input id="seed" type="text" inputmode="numeric" spellcheck="false">
@@ -55,10 +55,7 @@
         <label class="count-field">series
           <select id="tournament">
             <option value="1">Single race</option>
-            <option value="qual">Qualifier (3 rounds)</option>
-            <option value="3">Best of 3</option>
-            <option value="5">Best of 5</option>
-            <option value="7">Best of 7</option>
+            <option value="qual">Qualifier (elimination)</option>
           </select>
         </label>
         <label class="count-field">bias
@@ -120,6 +117,6 @@
   <datalist id="pick-list"></datalist>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-  <script type="module" src="js/main.js?v=53"></script>
+  <script type="module" src="js/main.js?v=54"></script>
 </body>
 </html>
