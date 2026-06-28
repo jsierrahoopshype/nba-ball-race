@@ -357,11 +357,11 @@ function drawRoundCard(ctx, info, t) {
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
-  // headline slam-in with gradient + sweep flash
+  // headline slam-in with gradient + sweep flash (custom text overrides default)
   const tIn = Math.min(1, t / 0.35);
   const over = 1 + (1 - tIn) * (1 - tIn) * 0.5;
   const titleY = H * 0.115 - (1 - tIn) * 70;
-  const title = `ROUND ${justFinished} COMPLETE`;
+  const title = (info.cardText && info.cardText.trim()) ? info.cardText.trim().toUpperCase() : `ROUND ${justFinished} COMPLETE`;
   const tfs = fit(title, W - 70);
   ctx.save();
   ctx.globalAlpha = tIn; ctx.translate(W / 2, titleY); ctx.scale(over, over);
@@ -388,48 +388,54 @@ function drawRoundCard(ctx, info, t) {
   }
   ctx.globalAlpha = 1;
 
-  // qualifiers fly up one by one with overshoot + landing flash
+  // Qualifiers, one per row as a centered badge (headshot + name), so names can
+  // never overlap. Each badge slides in from alternating sides, staggered.
   const adv = info.advancers;
-  const cols = adv.length <= 6 ? Math.min(3, adv.length) : 4;
-  const r = adv.length <= 3 ? 116 : adv.length <= 6 ? 96 : 80;
-  const cellW = Math.min(300, (W - 90) / cols);
-  const gridY = H * 0.42;
-  const cellH = r * 2 + 78;
+  const availTop = H * 0.31, availBot = H * 0.95;
+  const rowH = Math.min(185, (availBot - availTop) / adv.length);
+  const r = Math.min(66, rowH * 0.38);
+  const blockH = rowH * adv.length;
+  const startY = availTop + ((availBot - availTop) - blockH) / 2 + rowH / 2;
+  const padL = 18, gap = 26, padR = 44;
+  const maxNameW = (W - 80) - (padL + r * 2 + gap + padR);
   adv.forEach((ball, i) => {
     const p = ball.plugin.ball;
-    const col = i % cols, row = Math.floor(i / cols);
-    const cx = W / 2 + (col - (cols - 1) / 2) * cellW;
-    const cyF = gridY + row * cellH;
-    const k = Math.min(1, Math.max(0, (t - 0.5 - i * 0.13) / 0.42));
+    const cy = startY + i * rowH;
+    const k = Math.min(1, Math.max(0, (t - 0.5 - i * 0.12) / 0.4));
     if (k <= 0) return;
     const ease = 1 - Math.pow(1 - k, 3);
-    const cy = cyF + (1 - ease) * 240;
-    const pop = k < 1 ? 1 + (1 - k) * 0.45 : 1;
-    const rr = r * pop;
+    const slide = (1 - ease) * W * 0.6 * (i % 2 ? 1 : -1);
     ctx.globalAlpha = Math.min(1, k * 1.4);
-    // glow halo
-    const halo = ctx.createRadialGradient(cx, cy, rr * 0.7, cx, cy, rr * 1.7);
-    halo.addColorStop(0, `rgba(${accentRGB},0.55)`); halo.addColorStop(1, `rgba(${accentRGB},0)`);
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, rr * 1.7, 0, Math.PI * 2); ctx.fill();
-    cardFace(ctx, p, cx, cy, rr, accent);
+    ctx.save(); ctx.translate(slide, 0);
+    const nm = (p.name || p.label).toUpperCase();
+    const nfs = fit(nm, maxNameW, 800);
+    const nameW = ctx.measureText(nm).width;
+    const pillW = padL + r * 2 + gap + nameW + padR;
+    const pillH = r * 2 + 26;
+    const px = W / 2 - pillW / 2, py = cy - pillH / 2;
+    // pill
+    ctx.fillStyle = 'rgba(8,16,34,0.7)';
+    roundRect(ctx, px, py, pillW, pillH, pillH / 2); ctx.fill();
+    ctx.lineWidth = 3.5; ctx.strokeStyle = accent;
+    roundRect(ctx, px, py, pillW, pillH, pillH / 2); ctx.stroke();
+    // headshot + glow
+    const hx = px + padL + r;
+    const halo = ctx.createRadialGradient(hx, cy, r * 0.7, hx, cy, r * 1.5);
+    halo.addColorStop(0, `rgba(${accentRGB},0.5)`); halo.addColorStop(1, `rgba(${accentRGB},0)`);
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(hx, cy, r * 1.5, 0, Math.PI * 2); ctx.fill();
+    cardFace(ctx, p, hx, cy, r, accent);
     // landing flash
     if (k > 0.82 && k < 1) {
       ctx.globalAlpha = (1 - k) / 0.18;
-      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(hx, cy, r, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
       ctx.globalAlpha = Math.min(1, k * 1.4);
     }
-    // name pill
-    const nm = (p.name || p.label).toUpperCase();
-    const nfs = fit(nm, cellW - 24, 800);
-    const tw = ctx.measureText(nm).width;
-    const py = cy + r + 34, ph = nfs + 18, pw = tw + 34;
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    roundRect(ctx, cx - pw / 2, py - ph / 2, pw, ph, ph / 2); ctx.fill();
-    ctx.lineWidth = 3; ctx.strokeStyle = accent;
-    roundRect(ctx, cx - pw / 2, py - ph / 2, pw, ph, ph / 2); ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.font = `800 ${nfs}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(nm, cx, py);
+    // name
+    ctx.fillStyle = '#ffffff'; ctx.font = `800 ${nfs}px system-ui, sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(nm, hx + r + gap, cy);
+    ctx.restore();
     ctx.globalAlpha = 1;
   });
 }

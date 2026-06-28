@@ -29,6 +29,7 @@ const countSelect = document.getElementById('ball-count');
 const ballRowsEl = document.getElementById('ball-rows');
 const winModeSelect = document.getElementById('win-mode');
 const hookInput = document.getElementById('hook-text');
+const cardTextInput = document.getElementById('card-text');
 const showIntroChk = document.getElementById('show-intro');
 const coursePresetSelect = document.getElementById('course-preset');
 const biasPresetSelect = document.getElementById('bias-preset');
@@ -450,6 +451,7 @@ function qualifierInfo() {
     finalNext: tournament.roster.length <= 3,
     qualifyS: tournament.qualifyS, advancers: tournament.advancersBalls || [],
     championBall: tournament.championBall || race.winner,
+    cardText: cardTextInput ? cardTextInput.value : '',
   };
 }
 
@@ -478,7 +480,7 @@ btnHq.addEventListener('click', async () => {
     opts: { mode: winModeSelect.value === 'survivor' ? 'survivor' : 'finish',
       preset: coursePresetSelect ? coursePresetSelect.value : 'classic',
       analysts: buildAnalystsForRace(), bias: currentBias(), bg: currentBg() },
-    hook: hookInput.value || '', showIntro: !!(showIntroChk && showIntroChk.checked),
+    hook: hookInput.value || '', cardText: cardTextInput ? cardTextInput.value : '', showIntro: !!(showIntroChk && showIntroChk.checked),
   };
   hqBusy = true; btnHq.disabled = true; btnRace.disabled = true;
   try {
@@ -513,7 +515,7 @@ function buildTemplate() {
     app: 'nba-ball-race', version: 1,
     count: setup.count,
     mode: winModeSelect.value,
-    hook: hookInput.value || '',
+    hook: hookInput.value || '', cardText: cardTextInput ? cardTextInput.value : '',
     showIntro: !!(showIntroChk && showIntroChk.checked),
     course: coursePresetSelect ? coursePresetSelect.value : 'classic',
     bg: bgTypeSelect ? bgTypeSelect.value : 'sky',
@@ -573,6 +575,7 @@ function applyTemplate(t) {
   });
   if (t.mode) winModeSelect.value = t.mode;
   hookInput.value = t.hook || '';
+  if (cardTextInput) cardTextInput.value = t.cardText || '';
   if (showIntroChk) showIntroChk.checked = t.showIntro !== false;
   if (coursePresetSelect && t.course) coursePresetSelect.value = t.course;
   if (biasPresetSelect && t.bias) biasPresetSelect.value = t.bias;
