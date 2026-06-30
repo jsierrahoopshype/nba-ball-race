@@ -275,8 +275,10 @@ function finishRecording() {
   if (!recordingThisRace || downloadFired) return;
   downloadFired = true;
   const names = race.balls.map(b => b.plugin.ball.label.toLowerCase().replace(/[^a-z0-9]/g, '')).slice(0, 4).join('-');
-  recorder.stop(`race_${names}_s${race.seed}.webm`)
-    .then(ok => status(ok ? `saved race_${names}_s${race.seed}.webm to Downloads` : 'recording stopped (no data)'))
+  const ext = recorder.format ? recorder.format() : 'webm';
+  const base = `race_${names}_s${race.seed}`;
+  recorder.stop(`${base}.${ext}`)
+    .then(ok => status(ok ? `saved ${base}.${ext} to Downloads` : 'recording stopped (no data)'))
     .catch(e => status(`save failed: ${e.message}`));
 }
 
