@@ -105,7 +105,7 @@ async function applyPick(i, raw, row) {
       const [abbr, name] = team;
       const img = await loadImage(TEAM_LOGO_URL(abbr));
       if (img) {
-        setup.setImage(i, img, `team:${abbr}`, 'cover'); setup.setName(i, abbr);
+        setup.setImage(i, img, `team:${abbr}`, 'cover'); setup.setName(i, abbr); setup.setFullName(i, name);
         const tc = TEAM_COLORS[abbr];
         if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
         syncRow(row, i);
