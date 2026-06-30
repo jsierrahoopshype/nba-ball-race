@@ -654,6 +654,30 @@ function renderAnalystRows() {
     const emoji = document.createElement('input'); emoji.className = 'a-emoji'; emoji.placeholder = '🔥💀'; emoji.maxLength = 8; emoji.value = a.emoji || '';
     emoji.title = 'emojis to orbit the face as obstacles (up to 4)';
     emoji.addEventListener('input', () => { a.emoji = emoji.value; });
+    // Custom face upload. The photo's background is removed automatically (so a
+    // plain photo of e.g. a pundit becomes a clean cutout). First use downloads
+    // a small model; if removal fails for any reason, the photo is used as-is.
+    const file = document.createElement('input');
+    file.type = 'file'; file.accept = 'image/*'; file.id = `afile-${i}`; file.className = 'file-hidden';
+    file.addEventListener('change', async () => {
+      const f = file.files[0]; if (!f) return;
+      status(`processing ${a.name || 'analyst'} face… (first time downloads a model, ~10MB)`);
+      let srcUrl = URL.createObjectURL(f);
+      try {
+        const { removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.5.8');
+        const blob = await removeBackground(f, { model: 'isnet_quint8' });
+        srcUrl = URL.createObjectURL(blob);
+        status(`background removed for ${a.name || 'analyst'}`);
+      } catch (e) {
+        status(`couldn't remove background, using the photo as-is (${e.message})`);
+      }
+      const img = new Image();
+      img.onload = () => { a.image = img; a.source = 'upload'; markAnalystChip(i); };
+      img.src = srcUrl;
+    });
+    const fileBtn = document.createElement('label');
+    fileBtn.htmlFor = file.id; fileBtn.className = 'btn small'; fileBtn.textContent = 'IMG';
+    fileBtn.title = 'upload a custom face (background removed automatically)';
     const star = document.createElement('button'); star.className = 'btn small'; star.textContent = '★ Save'; star.title = 'save this analyst to your library';
     star.addEventListener('click', () => {
       if (!a.name && !a.source) { status('name the analyst first'); return; }
@@ -662,7 +686,7 @@ function renderAnalystRows() {
     });
     const del = document.createElement('button'); del.className = 'btn small'; del.textContent = '×'; del.title = 'remove';
     del.addEventListener('click', () => { analysts.splice(i, 1); renderAnalystRows(); });
-    row.append(chip, name, pick, speech, emoji, star, del);
+    row.append(chip, name, pick, speech, emoji, fileBtn, star, del, file);
     analystRowsEl.appendChild(row);
   });
 }
