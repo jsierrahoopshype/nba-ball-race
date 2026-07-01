@@ -46,12 +46,12 @@ export async function exportHQ(params, onProgress = () => {}) {
   // High profile, level 5.1 (comfortably covers 1080x1920@60). Verify support
   // and fall back to a lower bitrate config if the browser is picky.
   const baseCfg = { codec: 'avc1.640033', width: W, height: H, framerate: FPS };
-  let cfg = { ...baseCfg, bitrate: 12_000_000 };
+  let cfg = { ...baseCfg, bitrate: 8_000_000 };
   try {
     const probe = await VideoEncoder.isConfigSupported(cfg);
     if (!probe || !probe.supported) {
-      const probe2 = await VideoEncoder.isConfigSupported({ ...baseCfg, bitrate: 8_000_000 });
-      if (probe2 && probe2.supported) cfg = { ...baseCfg, bitrate: 8_000_000 };
+      const probe2 = await VideoEncoder.isConfigSupported({ ...baseCfg, bitrate: 6_000_000 });
+      if (probe2 && probe2.supported) cfg = { ...baseCfg, bitrate: 6_000_000 };
       else throw new Error('No supported H.264 config for 1080x1920 in this browser.');
     }
   } catch (e) {
