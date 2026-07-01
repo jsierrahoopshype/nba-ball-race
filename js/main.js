@@ -169,6 +169,31 @@ function renderRows() {
     });
     const fileBtn = document.createElement('label');
     fileBtn.htmlFor = file.id; fileBtn.className = 'btn small'; fileBtn.textContent = 'IMG';
+    fileBtn.title = 'upload an image, cropped into the ball as-is (keeps background)';
+
+    // FACE: upload any person's photo; the background is removed and it's shown as
+    // a clean cutout face, like the NBA headshots. Additive to the IMG button.
+    const faceFile = document.createElement('input');
+    faceFile.type = 'file'; faceFile.accept = 'image/*'; faceFile.id = `face-${i}`; faceFile.className = 'file-hidden';
+    faceFile.addEventListener('change', async () => {
+      const f = faceFile.files[0]; if (!f) return;
+      status('processing face… (first time downloads a model, ~10MB)');
+      let srcUrl = URL.createObjectURL(f);
+      try {
+        const { removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.5.8');
+        const blob = await removeBackground(f, { model: 'isnet_quint8' });
+        srcUrl = URL.createObjectURL(blob);
+        status('background removed');
+      } catch (e) {
+        status(`couldn't remove background, using photo as-is (${e.message})`);
+      }
+      const img = new Image();
+      img.onload = () => { setup.setImage(i, img, 'upload', 'face'); chip.textContent = '✓'; };
+      img.src = srcUrl;
+    });
+    const faceBtn = document.createElement('label');
+    faceBtn.htmlFor = faceFile.id; faceBtn.className = 'btn small'; faceBtn.textContent = 'FACE';
+    faceBtn.title = 'upload any person; background removed, shown as a face like NBA headshots';
 
     const clear = document.createElement('button');
     clear.className = 'btn small ghost'; clear.textContent = '×'; clear.title = 'Clear image';
@@ -191,7 +216,7 @@ function renderRows() {
     luckVal.style.color = (b.luck || 1) > 1 ? '#4ad17a' : ((b.luck || 1) < 1 ? '#e2683b' : '#9a9aa6');
     luckWrap.append(luck, luckVal);
 
-    row.append(chip, name, color, pick, fileBtn, file, clear, luckWrap);
+    row.append(chip, name, color, pick, fileBtn, file, faceBtn, faceFile, clear, luckWrap);
     ballRowsEl.appendChild(row);
   });
 }
