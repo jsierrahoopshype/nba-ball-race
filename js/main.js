@@ -127,7 +127,7 @@ async function applyPick(i, raw, row) {
 
 function syncRow(row, i) {
   const b = setup.balls[i];
-  row.querySelector('.name').value = b.label;
+  row.querySelector('.name').value = b.name || b.label;
   const chip = row.querySelector('.chip');
   chip.style.background = b.color;
   chip.textContent = b.image ? '✓' : '';
@@ -145,9 +145,17 @@ function renderRows() {
     chip.textContent = b.image ? '✓' : '';
 
     const name = document.createElement('input');
-    name.type = 'text'; name.maxLength = 5; name.value = b.label; name.className = 'name';
-    name.title = 'Label shown on the ball';
-    name.addEventListener('input', () => setup.setName(i, name.value));
+    // This is the display name shown in the leaderboard and cards. It also drives
+    // a short (<=5 char) label drawn on the ball itself when there's no image.
+    name.type = 'text'; name.maxLength = 24; name.value = b.name || b.label; name.className = 'name';
+    name.title = 'Name shown in the ranking and cards';
+    name.addEventListener('input', () => {
+      name.dataset.userEdited = '1';
+      const v = name.value.trim();
+      setup.setFullName(i, v);
+      const short = (v.split(/\s+/).pop() || v).slice(0, 5).toUpperCase();
+      setup.setName(i, short || `P${i + 1}`);
+    });
 
     const color = document.createElement('input');
     color.type = 'color'; color.value = b.color;
@@ -239,7 +247,11 @@ function autoloadFaces() {
         const tc = teamColorsForPlayer(p[2]);
         if (tc) { setup.setColor(i, tc[0]); setup.setColor2(i, tc[1]); }
         const row = ballRowsEl.children[i];
-        if (row) { const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓'; }
+        if (row) {
+          const chip = row.querySelector('.chip'); if (chip) chip.textContent = '✓';
+          // show the full name in the editable box so it can be changed for a custom racer
+          const nm = row.querySelector('.name'); if (nm && !nm.dataset.userEdited) nm.value = p[1];
+        }
       }
     });
   });
