@@ -67,7 +67,7 @@ function currentBg() {
   return { type };
 }
 
-const recorder = createRecorder(canvas);
+const recorder = createRecorder(canvas, (m) => status(m));
 if (!recorder.supported) { btnRec.disabled = true; btnRec.title = 'Recording not supported in this browser'; }
 
 const setup = createSetup(parseInt(countSelect.value, 10));
